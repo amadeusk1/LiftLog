@@ -44,18 +44,20 @@ fun BodyWeightLineChart(
     val unitLabel = if (unit == WeightUnit.LBS) "lbs" else "kg"
     val textMeasurer = rememberTextMeasurer()
 
-    // 👉 same date format you can also use in PRLineChart
-    val dateFormatter = remember {
+    // Incoming format from storage (e.g. "2025-12-09")
+    val rawDateFormatter = remember {
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+    }
+    // Pretty display format (e.g. "Dec 9, 2025")
+    val prettyDateFormatter = remember {
         SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
     }
 
-    // which point is currently selected (tapped)
     var selectedIndex by remember(entries, unit) { mutableStateOf<Int?>(null) }
 
     Canvas(
         modifier = modifier.pointerInput(entries, unit) {
             detectTapGestures { offset ->
-                // Same padding values as inside draw block
                 val paddingLeft = 80.dp.toPx()
                 val paddingBottom = 50.dp.toPx()
                 val paddingTop = 32.dp.toPx()
@@ -70,7 +72,6 @@ fun BodyWeightLineChart(
                     0f
                 }
 
-                // compute positions of each point
                 val points = weights.mapIndexed { index, w ->
                     val x = paddingLeft + stepX * index
                     val normalized = (w - minWeight) / range
@@ -87,7 +88,6 @@ fun BodyWeightLineChart(
             }
         }
     ) {
-        // Padding for axes + labels
         val paddingLeft = 80.dp.toPx()
         val paddingBottom = 50.dp.toPx()
         val paddingTop = 32.dp.toPx()
@@ -96,8 +96,7 @@ fun BodyWeightLineChart(
         val graphWidth = size.width - paddingLeft - paddingRight
         val graphHeight = size.height - paddingTop - paddingBottom
 
-        // --- Axes ---
-        // Y-axis
+        // Axes
         drawLine(
             color = Color.Gray,
             start = Offset(paddingLeft, paddingTop),
@@ -105,7 +104,6 @@ fun BodyWeightLineChart(
             strokeWidth = 2f
         )
 
-        // X-axis
         drawLine(
             color = Color.Gray,
             start = Offset(paddingLeft, paddingTop + graphHeight),
@@ -113,8 +111,7 @@ fun BodyWeightLineChart(
             strokeWidth = 2f
         )
 
-        // --- Axis labels ---
-        // Y label: "Bodyweight (lbs/kg)" – moved left of the Y-axis line
+        // Y label: "Bodyweight (lbs/kg)" left of Y-axis
         val yLabelText = "Bodyweight ($unitLabel)"
         val yLabelLayout = textMeasurer.measure(
             text = yLabelText,
@@ -140,7 +137,6 @@ fun BodyWeightLineChart(
             )
         )
 
-        // --- Line + points ---
         if (entries.size == 1) {
             val cx = paddingLeft + graphWidth / 2f
             val normalized = (weights[0] - minWeight) / range
@@ -184,7 +180,7 @@ fun BodyWeightLineChart(
                 style = Stroke(width = 4f)
             )
 
-            // --- Tooltip for selected point ---
+            // Tooltip
             val idx = selectedIndex
             if (idx != null && idx in entries.indices) {
                 val entry = entries[idx]
@@ -192,7 +188,15 @@ fun BodyWeightLineChart(
                 val displayWeight = weights[idx]
 
                 val weightText = "%.1f".format(displayWeight)
-                val dateText = dateFormatter.format(entry.date)
+
+                // Convert stored "yyyy-MM-dd" string into "MMM d, yyyy"
+                val dateText = try {
+                    val parsed = rawDateFormatter.parse(entry.date)
+                    if (parsed != null) prettyDateFormatter.format(parsed) else entry.date
+                } catch (_: Exception) {
+                    entry.date
+                }
+
                 val tooltipText = "$weightText $unitLabel\n$dateText"
 
                 val textLayout = textMeasurer.measure(
@@ -207,12 +211,10 @@ fun BodyWeightLineChart(
                 var boxX = point.x - boxWidth / 2
                 var boxY = point.y - boxHeight - 16f
 
-                // Clamp inside canvas
                 if (boxX < 0f) boxX = 0f
                 if (boxX + boxWidth > size.width) boxX = size.width - boxWidth
                 if (boxY < 0f) boxY = point.y + 16f
 
-                // Background box
                 drawRoundRect(
                     color = Color.Black.copy(alpha = 0.8f),
                     topLeft = Offset(boxX, boxY),
@@ -220,7 +222,6 @@ fun BodyWeightLineChart(
                     cornerRadius = CornerRadius(8.dp.toPx(), 8.dp.toPx())
                 )
 
-                // Tooltip text
                 drawText(
                     textLayoutResult = textLayout,
                     color = Color.White,

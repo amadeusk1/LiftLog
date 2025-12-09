@@ -18,6 +18,8 @@ import com.amadeusk.liftlog.data.savePrsToFile
 import com.amadeusk.liftlog.data.loadUnitPreference
 import com.amadeusk.liftlog.data.saveUnitPreference
 import com.amadeusk.liftlog.data.BodyWeightEntry
+import com.amadeusk.liftlog.data.loadBwFromFile
+import com.amadeusk.liftlog.data.saveBwToFile
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,21 +70,17 @@ fun LiftLogApp() {
         }
     }
 
-    // Bodyweight list
     val bodyWeights = remember {
         mutableStateListOf<BodyWeightEntry>().apply {
-            // if you have persistence:
-            // addAll(loadBodyWeightFromFile(context))
+            addAll(loadBwFromFile(context))
         }
     }
 
-    // Save bodyweight when changed (optional if you implement persistence)
     LaunchedEffect(bodyWeights.toList()) {
-        // saveBodyWeightToFile(context, bodyWeights)
+        saveBwToFile(context, bodyWeights)
     }
 
     var showAddBodyWeightDialog by remember { mutableStateOf(false) }
-
 
     Scaffold(
         topBar = {
@@ -90,7 +88,7 @@ fun LiftLogApp() {
                 title = {
                     Text(
                         when (currentScreen) {
-                            LiftLogScreen.Overview -> "LiftLog – Overview"
+                            LiftLogScreen.Overview -> "Overview"
                             LiftLogScreen.History -> "History"
                         }
                     )
@@ -104,7 +102,6 @@ fun LiftLogApp() {
                                         launchSingleTop = true
                                     }
                                 }
-
                                 LiftLogScreen.History -> {
                                     navController.navigate(LiftLogScreen.Overview.name) {
                                         launchSingleTop = true
@@ -160,7 +157,6 @@ fun LiftLogApp() {
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                // -------- NAVHOST AREA --------
                 NavHost(
                     navController = navController,
                     startDestination = LiftLogScreen.Overview.name,
@@ -212,6 +208,5 @@ fun LiftLogApp() {
                 }
             )
         }
-
     }
 }
