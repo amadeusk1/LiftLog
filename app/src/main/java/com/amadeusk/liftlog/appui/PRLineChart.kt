@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -106,14 +107,36 @@ fun PRLineChart(
             strokeWidth = 2f
         )
 
-        // --- Axis labels (no numeric values) ---
-        // Y label: "Weight (lbs/kg)"
-        drawText(
-            textMeasurer = textMeasurer,
-            text = "Weight ($unitLabel)",
-            style = TextStyle(fontSize = 12.sp, color = Color.Gray),
-            topLeft = Offset(8f, paddingTop)
+        // --- Axis labels ---
+        // Y label: "Weight (lbs/kg)" rotated 90°
+        val yLabelText = "Weight ($unitLabel)"
+        val yLabelStyle = TextStyle(fontSize = 12.sp, color = Color.Gray)
+        val yLabelLayout = textMeasurer.measure(
+            text = yLabelText,
+            style = yLabelStyle
         )
+
+        // Position the center of the text near the middle of the Y-axis
+        val yLabelCenterX = 24.dp.toPx()                // a bit away from the edge
+        val yLabelCenterY = paddingTop + graphHeight / 2f
+
+        val yLabelTopLeft = Offset(
+            x = yLabelCenterX - yLabelLayout.size.width / 2f,
+            y = yLabelCenterY - yLabelLayout.size.height / 2f
+        )
+
+        withTransform({
+            rotate(
+                degrees = -90f, // rotate counter-clockwise
+                pivot = Offset(yLabelCenterX, yLabelCenterY)
+            )
+        }) {
+            drawText(
+                textLayoutResult = yLabelLayout,
+                topLeft = yLabelTopLeft,
+                color = Color.Gray
+            )
+        }
 
         // X label: "Date"
         drawText(
@@ -177,7 +200,6 @@ fun PRLineChart(
                 val point = points[idx]
                 val displayWeight = weights[idx]
 
-                // format weight to 1 decimal place
                 val weightText = "%.1f".format(displayWeight)
                 val tooltipText = "$weightText $unitLabel × ${pr.reps} reps\n${pr.date}"
 
@@ -185,7 +207,6 @@ fun PRLineChart(
                     text = tooltipText,
                     style = TextStyle(fontSize = 12.sp, color = Color.White)
                 )
-
 
                 val padding = 6.dp.toPx()
                 val boxWidth = textLayout.size.width + padding * 2

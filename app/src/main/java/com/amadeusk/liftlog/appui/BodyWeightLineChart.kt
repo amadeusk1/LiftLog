@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
@@ -111,20 +112,35 @@ fun BodyWeightLineChart(
             strokeWidth = 2f
         )
 
-        // Y label: "Bodyweight (lbs/kg)" left of Y-axis
+        // --- Y label: "Bodyweight (lbs/kg)" rotated 90° ---
         val yLabelText = "Bodyweight ($unitLabel)"
+        val yLabelStyle = TextStyle(fontSize = 12.sp, color = Color.Gray)
         val yLabelLayout = textMeasurer.measure(
             text = yLabelText,
-            style = TextStyle(fontSize = 12.sp, color = Color.Gray)
+            style = yLabelStyle
         )
-        val yLabelX = paddingLeft - yLabelLayout.size.width - 8.dp.toPx()
 
-        drawText(
-            textMeasurer = textMeasurer,
-            text = yLabelText,
-            style = TextStyle(fontSize = 12.sp, color = Color.Gray),
-            topLeft = Offset(yLabelX, paddingTop)
+        // Center of the label near the middle of the Y-axis
+        val yLabelCenterX = 24.dp.toPx()                 // distance from left edge
+        val yLabelCenterY = paddingTop + graphHeight / 2f
+
+        val yLabelTopLeft = Offset(
+            x = yLabelCenterX - yLabelLayout.size.width / 2f,
+            y = yLabelCenterY - yLabelLayout.size.height / 2f
         )
+
+        withTransform({
+            rotate(
+                degrees = -90f,
+                pivot = Offset(yLabelCenterX, yLabelCenterY)
+            )
+        }) {
+            drawText(
+                textLayoutResult = yLabelLayout,
+                topLeft = yLabelTopLeft,
+                color = Color.Gray
+            )
+        }
 
         // X label: "Date"
         drawText(
