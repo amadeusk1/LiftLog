@@ -18,22 +18,13 @@ import com.amadeusk.liftlog.data.savePrsToFile
 import com.amadeusk.liftlog.data.loadUnitPreference
 import com.amadeusk.liftlog.data.saveUnitPreference
 
-// ---------- simple 2-screen navigation ----------
-
-enum class LiftLogScreen {
-    Overview,   // graph page
-    History     // list of all entries
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiftLogApp() {
     val context = LocalContext.current
 
-    // Navigation controller
+    // Navigation
     val navController = rememberNavController()
-
-    // Observe current destination to update top bar label + button text
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentScreen: LiftLogScreen =
         when (navBackStackEntry?.destination?.route) {
@@ -43,28 +34,27 @@ fun LiftLogApp() {
             else -> LiftLogScreen.Overview
         }
 
-    // Load PRs
+    // PRs state
     val prs = remember {
         mutableStateListOf<PR>().apply {
             addAll(loadPrsFromFile(context))
         }
     }
 
-    // Save PRs when changed
     LaunchedEffect(prs.toList()) {
         savePrsToFile(context, prs)
     }
 
-    // Load unit preference (LBS default)
+    // Unit preference
     var unit by remember {
         mutableStateOf(loadUnitPreference(context))
     }
 
-    // Save unit preference when changed
     LaunchedEffect(unit) {
         saveUnitPreference(context, unit)
     }
 
+    // UI state
     var showAddDialog by remember { mutableStateOf(false) }
 
     // Distinct exercise names for selector
@@ -84,7 +74,7 @@ fun LiftLogApp() {
                     Text(
                         when (currentScreen) {
                             LiftLogScreen.Overview -> "LiftLog – Overview"
-                            LiftLogScreen.History -> "LiftLog – History"
+                            LiftLogScreen.History -> "History"
                         }
                     )
                 },
@@ -144,7 +134,7 @@ fun LiftLogApp() {
                     .padding(padding)
             ) {
 
-                // Unit toggle shows on both screens
+                // Unit toggle visible on all screens
                 WeightUnitToggle(
                     current = unit,
                     onUnitChange = { unit = it },
@@ -153,7 +143,7 @@ fun LiftLogApp() {
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
 
-                // ------- NAVHOST AREA -------
+                // -------- NAVHOST AREA --------
                 NavHost(
                     navController = navController,
                     startDestination = LiftLogScreen.Overview.name,
@@ -191,68 +181,4 @@ fun LiftLogApp() {
             )
         }
     }
-}
-
-// ---------- Screen Composables used by NavHost ----------
-
-@Composable
-private fun OverviewScreen(
-    prs: List<PR>,
-    unit: WeightUnit,
-    exercises: List<String>,
-    selectedExercise: String?,
-    onSelectedExerciseChange: (String?) -> Unit
-) {
-    if (exercises.isEmpty()) return
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        ExerciseSelector(
-            exercises = exercises,
-            selected = selectedExercise,
-            onSelectedChange = onSelectedExerciseChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-
-        val selected = selectedExercise
-        if (selected != null) {
-            val filtered = prs
-                .filter { it.exercise == selected }
-                .sortedBy { it.date }
-
-            if (filtered.isNotEmpty()) {
-                Text(
-                    text = "Progress for $selected (${if (unit == WeightUnit.LBS) "lbs" else "kg"})",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                )
-
-                PRLineChart(
-                    entries = filtered,
-                    unit = unit,
-                    modifier = Modifier
-                        .height(220.dp)
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HistoryScreen(
-    prs: List<PR>,
-    unit: WeightUnit
-) {
-    PRList(
-        prs = prs,
-        unit = unit,
-        modifier = Modifier.fillMaxSize()
-    )
 }
