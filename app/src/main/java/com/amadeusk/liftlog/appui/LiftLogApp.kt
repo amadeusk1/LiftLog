@@ -17,6 +17,7 @@ import com.amadeusk.liftlog.data.loadPrsFromFile
 import com.amadeusk.liftlog.data.savePrsToFile
 import com.amadeusk.liftlog.data.loadUnitPreference
 import com.amadeusk.liftlog.data.saveUnitPreference
+import com.amadeusk.liftlog.data.BodyWeightEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,6 +67,22 @@ fun LiftLogApp() {
             selectedExercise = exercises.first()
         }
     }
+
+    // Bodyweight list
+    val bodyWeights = remember {
+        mutableStateListOf<BodyWeightEntry>().apply {
+            // if you have persistence:
+            // addAll(loadBodyWeightFromFile(context))
+        }
+    }
+
+    // Save bodyweight when changed (optional if you implement persistence)
+    LaunchedEffect(bodyWeights.toList()) {
+        // saveBodyWeightToFile(context, bodyWeights)
+    }
+
+    var showAddBodyWeightDialog by remember { mutableStateOf(false) }
+
 
     Scaffold(
         topBar = {
@@ -155,7 +172,9 @@ fun LiftLogApp() {
                             unit = unit,
                             exercises = exercises,
                             selectedExercise = selectedExercise,
-                            onSelectedExerciseChange = { selectedExercise = it }
+                            onSelectedExerciseChange = { selectedExercise = it },
+                            bodyWeights = bodyWeights,
+                            onAddBodyWeightClick = { showAddBodyWeightDialog = true }
                         )
                     }
 
@@ -166,6 +185,7 @@ fun LiftLogApp() {
                         )
                     }
                 }
+
             }
         }
 
@@ -180,5 +200,18 @@ fun LiftLogApp() {
                 }
             )
         }
+
+        if (showAddBodyWeightDialog) {
+            AddBodyWeightDialog(
+                currentUnit = unit,
+                onDismiss = { showAddBodyWeightDialog = false },
+                onSave = { entry ->
+                    val nextId = (bodyWeights.maxOfOrNull { it.id } ?: 0) + 1
+                    bodyWeights.add(entry.copy(id = nextId))
+                    showAddBodyWeightDialog = false
+                }
+            )
+        }
+
     }
 }
