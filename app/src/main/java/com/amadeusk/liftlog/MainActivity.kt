@@ -360,12 +360,18 @@ fun PRRow(pr: PR) {
 
 // ---------- ADD PR DIALOG ----------
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPrDialog(
     onDismiss: () -> Unit,
     onSave: (PR) -> Unit
 ) {
-    var exercise by remember { mutableStateOf("") }
+    val exerciseOptions = listOf("Bench Press", "Squat", "Deadlift", "Other")
+
+    var expanded by remember { mutableStateOf(false) }
+    var selectedOption by remember { mutableStateOf(exerciseOptions[0]) }
+    var otherExercise by remember { mutableStateOf("") }
+
     var weight by remember { mutableStateOf("") }
     var reps by remember { mutableStateOf("") }
 
@@ -374,23 +380,72 @@ fun AddPrDialog(
         title = { Text("New PR") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = exercise,
-                    onValueChange = { exercise = it },
-                    label = { Text("Exercise (e.g. Bench Press)") },
-                    singleLine = true
-                )
+
+                // --- Exercise dropdown ---
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = if (selectedOption == "Other" && otherExercise.isNotBlank())
+                            otherExercise
+                        else
+                            selectedOption,
+                        onValueChange = { },           // read-only field
+                        readOnly = true,
+                        label = { Text("Exercise") },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        exerciseOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    selectedOption = option
+                                    if (option != "Other") {
+                                        otherExercise = ""
+                                    }
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // If "Other" selected, show custom name field
+                if (selectedOption == "Other") {
+                    OutlinedTextField(
+                        value = otherExercise,
+                        onValueChange = { otherExercise = it },
+                        label = { Text("Custom exercise name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // --- Weight & reps ---
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { weight = it },
                     label = { Text("Weight (kg)") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = reps,
                     onValueChange = { reps = it },
                     label = { Text("Reps") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
@@ -400,7 +455,11 @@ fun AddPrDialog(
                     val w = weight.toFloatOrNull()
                     val r = reps.toIntOrNull()
 
-                    if (exercise.isNotBlank() && w != null && r != null) {
+                    val exerciseName =
+                        if (selectedOption == "Other") otherExercise.trim()
+                        else selectedOption
+
+                    if (exerciseName.isNotBlank() && w != null && r != null) {
                         val date = SimpleDateFormat(
                             "yyyy-MM-dd",
                             Locale.getDefault()
@@ -409,7 +468,7 @@ fun AddPrDialog(
                         onSave(
                             PR(
                                 id = 0,
-                                exercise = exercise.trim(),
+                                exercise = exerciseName,
                                 weight = w,
                                 reps = r,
                                 date = date
@@ -428,3 +487,4 @@ fun AddPrDialog(
         }
     )
 }
+
