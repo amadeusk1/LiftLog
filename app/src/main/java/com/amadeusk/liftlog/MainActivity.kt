@@ -38,7 +38,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.amadeusk.liftlog.data.loadBodyWeightsFromFile
 import com.amadeusk.liftlog.data.saveBodyWeightsToFile
 
-
 // ---- Tabs for main content ----
 enum class LiftLogTab {
     PRS,
@@ -112,6 +111,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiftLogRoot(viewModel: PRViewModel) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
     // Tabs: PRs vs Bodyweight
@@ -129,8 +129,10 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     var selectedGraphPr by remember { mutableStateOf<PR?>(null) }
     var selectedRange by remember { mutableStateOf(GraphRange.MONTH) }
 
-    // Bodyweight state (in-memory for now)
-    var bodyWeights by remember { mutableStateOf<List<BodyWeightEntry>>(emptyList()) }
+    // Bodyweight state (PERSISTED via file)
+    var bodyWeights by remember {
+        mutableStateOf(loadBodyWeightsFromFile(context))
+    }
     var showAddBwDialog by remember { mutableStateOf(false) }
     var bwBeingEdited by remember { mutableStateOf<BodyWeightEntry?>(null) }
 
@@ -345,7 +347,9 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                     useKg = useKg,
                                     onEdit = { bwBeingEdited = entry },
                                     onDelete = {
-                                        bodyWeights = bodyWeights.filterNot { it.id == entry.id }
+                                        bodyWeights =
+                                            bodyWeights.filterNot { it.id == entry.id }
+                                        saveBodyWeightsToFile(context, bodyWeights)
                                     }
                                 )
                             }
@@ -460,6 +464,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     weight = weightKg
                 )
                 bodyWeights = bodyWeights + newEntry
+                saveBodyWeightsToFile(context, bodyWeights)
                 showAddBwDialog = false
             }
         )
@@ -486,6 +491,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 bodyWeights = bodyWeights.map {
                     if (it.id == entry.id) updated else it
                 }
+                saveBodyWeightsToFile(context, bodyWeights)
                 bwBeingEdited = null
             }
         )
@@ -611,7 +617,8 @@ fun ExerciseGraph(
                         val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
                         val maxWeight = weights.maxOrNull() ?: 0.0
                         val minWeight = weights.minOrNull() ?: 0.0
-                        val weightRange = (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
+                        val weightRange =
+                            (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
 
                         val padding = 32f
                         val width = size.width.toFloat() - 2 * padding
@@ -653,7 +660,8 @@ fun ExerciseGraph(
                 val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
                 val maxWeight = weights.maxOrNull() ?: 0.0
                 val minWeight = weights.minOrNull() ?: 0.0
-                val weightRange = (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
+                val weightRange =
+                    (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
 
                 val padding = 32f
                 val width = size.width - 2 * padding
