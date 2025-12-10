@@ -26,6 +26,41 @@ import androidx.compose.ui.unit.dp
 import com.amadeusk.liftlog.data.PR
 import com.amadeusk.liftlog.ui.theme.LiftLogTheme
 import kotlin.math.hypot
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
+
+// ---- Time range for graph/history ----
+enum class GraphRange {
+    MONTH,
+    YEAR,
+    ALL
+}
+
+private val prDateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+
+private fun filterPrsByRange(prs: List<PR>, range: GraphRange): List<PR> {
+    if (range == GraphRange.ALL) return prs
+
+    val now = LocalDate.now()
+    val startDate = when (range) {
+        GraphRange.MONTH -> now.withDayOfMonth(1)   // start of this month
+        GraphRange.YEAR -> now.withDayOfYear(1)     // start of this year
+        GraphRange.ALL -> LocalDate.MIN             // not used
+    }
+
+    return prs.filter { pr ->
+        val date = try {
+            LocalDate.parse(pr.date, prDateFormatter)
+        } catch (_: DateTimeParseException) {
+            // If date can't be parsed, keep it so user data doesn't disappear
+            return@filter true
+        }
+        !date.isBefore(startDate) // date >= startDate
+    }
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -62,10 +97,13 @@ fun PRScreen(viewModel: PRViewModel) {
     // Selected point on the graph
     var selectedGraphPr by remember { mutableStateOf<PR?>(null) }
 
+    // Selected time range for graph/history
+    var selectedRange by remember { mutableStateOf(GraphRange.MONTH) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("LiftLog – PR Tracker") }
+                title = { Text("LiftLog") }
             )
         },
         floatingActionButton = {
@@ -80,7 +118,7 @@ fun PRScreen(viewModel: PRViewModel) {
                 .fillMaxSize()
         ) {
 
-            // --- Exercise selector + graph at the top ---
+            // --- Exercise selector + range selector + graph at the top ---
             if (exercises.isNotEmpty()) {
                 ExerciseSelector(
                     exercises = exercises,
@@ -91,11 +129,20 @@ fun PRScreen(viewModel: PRViewModel) {
                     }
                 )
 
+                GraphRangeSelector(
+                    selectedRange = selectedRange,
+                    onRangeSelected = { range ->
+                        selectedRange = range
+                        selectedGraphPr = null
+                    }
+                )
+
                 Spacer(modifier = Modifier.height(8.dp))
 
-                val prsForSelected = uiState.prs
-                    .filter { it.exercise == selectedExercise }
-                    .sortedBy { it.id }
+                val prsForSelected = filterPrsByRange(
+                    uiState.prs.filter { it.exercise == selectedExercise },
+                    selectedRange
+                ).sortedBy { it.id }
 
                 ExerciseGraph(
                     prs = prsForSelected,
@@ -151,7 +198,7 @@ fun PRScreen(viewModel: PRViewModel) {
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
             }
 
-            // --- PR history below graph (ONLY selected exercise, NEWEST -> OLDEST) ---
+            // --- PR history below graph (ONLY selected exercise, filtered by range, NEWEST -> OLDEST) ---
             if (uiState.prs.isEmpty()) {
                 // No PRs at all
                 Box(
@@ -162,9 +209,10 @@ fun PRScreen(viewModel: PRViewModel) {
                 }
             } else {
                 val history = if (selectedExercise != null) {
-                    uiState.prs
-                        .filter { it.exercise == selectedExercise }
-                        .sortedByDescending { it.id }   // NEWEST → OLDEST
+                    filterPrsByRange(
+                        uiState.prs.filter { it.exercise == selectedExercise },
+                        selectedRange
+                    ).sortedByDescending { it.id }   // NEWEST → OLDEST
                 } else {
                     emptyList()
                 }
@@ -174,7 +222,7 @@ fun PRScreen(viewModel: PRViewModel) {
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No PRs yet for this exercise.")
+                        Text("No PRs yet for this exercise in this range.")
                     }
                 } else {
                     LazyColumn(
@@ -211,6 +259,7 @@ fun PRScreen(viewModel: PRViewModel) {
                 initialDate = "",
                 onDismiss = { showAddDialog = false },
                 onConfirm = { exercise, weightStr, repsStr, date ->
+
                     viewModel.addPr(
                         exercise = exercise,
                         weight = weightStr.toDoubleOrNull() ?: 0.0,
@@ -283,6 +332,50 @@ fun ExerciseSelector(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun GraphRangeSelector(
+    selectedRange: GraphRange,
+    onRangeSelected: (GraphRange) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        RangeButton("This month", GraphRange.MONTH, selectedRange, onRangeSelected)
+        RangeButton("This year", GraphRange.YEAR, selectedRange, onRangeSelected)
+        RangeButton("All time", GraphRange.ALL, selectedRange, onRangeSelected)
+    }
+}
+
+@Composable
+private fun RangeButton(
+    label: String,
+    range: GraphRange,
+    selectedRange: GraphRange,
+    onRangeSelected: (GraphRange) -> Unit
+) {
+    val selected = selectedRange == range
+    OutlinedButton(
+        onClick = { onRangeSelected(range) },
+        colors = if (selected) {
+            ButtonDefaults.outlinedButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+            )
+        } else {
+            ButtonDefaults.outlinedButtonColors()
+        },
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            color = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            style = MaterialTheme.typography.labelLarge
+        )
     }
 }
 
