@@ -1,9 +1,9 @@
 package com.amadeusk.liftlog.data
 
 data class PR(
-    val id: Int,
+    val id: Long = System.currentTimeMillis(),
     val exercise: String,
-    val weight: Float,
+    val weight: Double,
     val reps: Int,
-    val date: String
+    val date: String // you can later switch this to LocalDate
 )
