@@ -74,6 +74,14 @@ private fun filterPrsByRange(prs: List<PR>, range: GraphRange): List<PR> {
     }
 }
 
+// Parse user-entered date or fallback so ordering still works
+private fun parsePrDateOrMin(dateStr: String): LocalDate =
+    try {
+        LocalDate.parse(dateStr, prDateFormatter)
+    } catch (_: Exception) {
+        LocalDate.MIN
+    }
+
 // ---- Unit helpers ----
 private const val KG_TO_LB = 2.2046226
 private const val LB_TO_KG = 1.0 / KG_TO_LB
@@ -218,7 +226,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         val prsForSelected = filterPrsByRange(
                             uiState.prs.filter { it.exercise == selectedExercise },
                             selectedRange
-                        ).sortedBy { it.id }
+                        ).sortedBy { parsePrDateOrMin(it.date) }
 
                         ExerciseGraph(
                             prs = prsForSelected,
@@ -287,7 +295,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                             filterPrsByRange(
                                 uiState.prs.filter { it.exercise == selectedExercise },
                                 selectedRange
-                            ).sortedByDescending { it.id }
+                            ).sortedByDescending { parsePrDateOrMin(it.date) }
                         } else emptyList()
 
                         if (history.isEmpty()) {
@@ -599,8 +607,13 @@ fun ExerciseGraph(
         return
     }
 
-    // Sort by time (id) so the graph goes left → right in order added
-    val sorted = remember(prs) { prs.sortedBy { it.id } }
+    // Sort by user-input date so the graph goes left → right in chronological order
+    val sorted = remember(prs) {
+        prs.sortedWith(
+            compareBy<PR> { parsePrDateOrMin(it.date) }
+                .thenBy { it.id }
+        )
+    }
 
     Column(modifier = modifier) {
         Text(
