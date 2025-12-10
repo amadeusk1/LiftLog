@@ -60,7 +60,7 @@ private fun filterPrsByRange(prs: List<PR>, range: GraphRange): List<PR> {
     val startDate = when (range) {
         GraphRange.MONTH -> now.withDayOfMonth(1)   // start of this month
         GraphRange.YEAR -> now.withDayOfYear(1)     // start of this year
-        GraphRange.ALL -> LocalDate.MIN             // not used
+        GraphRange.ALL -> LocalDate.MIN
     }
 
     return prs.filter { pr ->
@@ -71,6 +71,30 @@ private fun filterPrsByRange(prs: List<PR>, range: GraphRange): List<PR> {
             return@filter true
         }
         !date.isBefore(startDate) // date >= startDate
+    }
+}
+
+// Same style filter for bodyweight entries
+private fun filterBodyWeightsByRange(
+    entries: List<BodyWeightEntry>,
+    range: GraphRange
+): List<BodyWeightEntry> {
+    if (range == GraphRange.ALL) return entries
+
+    val now = LocalDate.now()
+    val startDate = when (range) {
+        GraphRange.MONTH -> now.withDayOfMonth(1)
+        GraphRange.YEAR -> now.withDayOfYear(1)
+        GraphRange.ALL -> LocalDate.MIN
+    }
+
+    return entries.filter { e ->
+        val date = try {
+            LocalDate.parse(e.date, prDateFormatter)
+        } catch (_: DateTimeParseException) {
+            return@filter true
+        }
+        !date.isBefore(startDate)
     }
 }
 
@@ -143,6 +167,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     }
     var showAddBwDialog by remember { mutableStateOf(false) }
     var bwBeingEdited by remember { mutableStateOf<BodyWeightEntry?>(null) }
+    var selectedBwEntry by remember { mutableStateOf<BodyWeightEntry?>(null) }
 
     // Units
     var useKg by remember { mutableStateOf(true) }
@@ -340,26 +365,111 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                             Text("No bodyweight entries yet. Tap + to add one.")
                         }
                     } else {
-                        LazyColumn(
+                        // Range selector for bodyweight
+                        GraphRangeSelector(
+                            selectedRange = selectedRange,
+                            onRangeSelected = { range ->
+                                selectedRange = range
+                                selectedBwEntry = null
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        val bwForRange = filterBodyWeightsByRange(bodyWeights, selectedRange)
+                            .sortedBy { parsePrDateOrMin(it.date) }
+
+                        BodyWeightGraph(
+                            entries = bwForRange,
+                            selectedEntry = selectedBwEntry,
+                            onPointSelected = { entry -> selectedBwEntry = entry },
+                            useKg = useKg,
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(
-                                bodyWeights.sortedByDescending { it.id },
-                                key = { it.id }
-                            ) { entry ->
-                                BodyWeightItem(
-                                    entry = entry,
-                                    useKg = useKg,
-                                    onEdit = { bwBeingEdited = entry },
-                                    onDelete = {
-                                        bodyWeights =
-                                            bodyWeights.filterNot { it.id == entry.id }
-                                        saveBodyWeightsToFile(context, bodyWeights)
+                                .fillMaxWidth()
+                                .height(220.dp)
+                                .padding(horizontal = 16.dp)
+                        )
+
+                        // Details card for selected bodyweight point
+                        selectedBwEntry?.let { entry ->
+                            val unitLabel = if (useKg) "kg" else "lb"
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    Text(
+                                        text = "Bodyweight",
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = "Weight: ${formatWeight(entry.weight, useKg)} $unitLabel"
+                                    )
+                                    Text(text = "Date: ${entry.date}")
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.End,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        TextButton(onClick = { bwBeingEdited = entry }) {
+                                            Text("Edit")
+                                        }
+                                        TextButton(onClick = {
+                                            bodyWeights =
+                                                bodyWeights.filterNot { it.id == entry.id }
+                                            saveBodyWeightsToFile(context, bodyWeights)
+                                            selectedBwEntry = null
+                                        }) {
+                                            Text("Delete")
+                                        }
                                     }
-                                )
+                                }
+                            }
+                        }
+
+                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                        // History list for bodyweight (filtered by range, newest -> oldest)
+                        val history = bwForRange.sortedByDescending {
+                            parsePrDateOrMin(it.date)
+                        }
+
+                        if (history.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No bodyweight entries in this range.")
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(
+                                    history,
+                                    key = { it.id }
+                                ) { entry ->
+                                    BodyWeightItem(
+                                        entry = entry,
+                                        useKg = useKg,
+                                        onEdit = { bwBeingEdited = entry },
+                                        onDelete = {
+                                            bodyWeights =
+                                                bodyWeights.filterNot { it.id == entry.id }
+                                            saveBodyWeightsToFile(context, bodyWeights)
+                                            if (selectedBwEntry?.id == entry.id) {
+                                                selectedBwEntry = null
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -723,6 +833,148 @@ fun ExerciseGraph(
 
                     // Inner circle (highlight if selected)
                     val isSelected = pr == selectedPr
+                    drawCircle(
+                        color = if (isSelected) Color(0xFFBB86FC) else Color(0xFF000000),
+                        radius = if (isSelected) 8f else 6f,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BodyWeightGraph(
+    entries: List<BodyWeightEntry>,
+    selectedEntry: BodyWeightEntry?,
+    onPointSelected: (BodyWeightEntry) -> Unit,
+    useKg: Boolean,
+    modifier: Modifier = Modifier
+) {
+    if (entries.size < 2) {
+        Column(modifier = modifier) {
+            Text(
+                text = "Not enough data to draw a graph yet.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+        return
+    }
+
+    val sorted = remember(entries) {
+        entries.sortedWith(
+            compareBy<BodyWeightEntry> { parsePrDateOrMin(it.date) }
+                .thenBy { it.id }
+        )
+    }
+
+    Column(modifier = modifier) {
+        Text(
+            text = "Bodyweight Progress",
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(sorted, useKg) {
+                    detectTapGestures { tapOffset ->
+                        val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
+                        val maxWeight = weights.maxOrNull() ?: 0.0
+                        val minWeight = weights.minOrNull() ?: 0.0
+                        val weightRange =
+                            (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
+
+                        val padding = 32f
+                        val width = size.width.toFloat() - 2 * padding
+                        val height = size.height.toFloat() - 2 * padding
+                        val stepX = width / (sorted.size - 1).coerceAtLeast(1)
+
+                        val points = sorted.mapIndexed { index, entry ->
+                            val w = weights[index]
+                            val x = padding + stepX * index
+                            val normalized = (w - minWeight) / weightRange
+                            val y = padding + (1f - normalized.toFloat()) * height
+                            Offset(x, y) to entry
+                        }
+
+                        val hit = points.minByOrNull { (center, _) ->
+                            hypot(
+                                center.x - tapOffset.x,
+                                center.y - tapOffset.y
+                            )
+                        }
+
+                        val hitRadiusPx = 80f
+                        if (hit != null) {
+                            val (center, entry) = hit
+                            val distance = hypot(
+                                center.x - tapOffset.x,
+                                center.y - tapOffset.y
+                            )
+                            if (distance <= hitRadiusPx) {
+                                onPointSelected(entry)
+                            }
+                        }
+                    }
+                }
+        ) {
+            Canvas(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
+                val maxWeight = weights.maxOrNull() ?: 0.0
+                val minWeight = weights.minOrNull() ?: 0.0
+                val weightRange =
+                    (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
+
+                val padding = 32f
+                val width = size.width - 2 * padding
+                val height = size.height - 2 * padding
+                val stepX = width / (sorted.size - 1).coerceAtLeast(1)
+
+                val path = Path()
+
+                sorted.forEachIndexed { index, entry ->
+                    val w = weights[index]
+                    val x = padding + stepX * index
+                    val normalized = (w - minWeight) / weightRange
+                    val y = padding + (1f - normalized.toFloat()) * height
+
+                    if (index == 0) {
+                        path.moveTo(x, y)
+                    } else {
+                        path.lineTo(x, y)
+                    }
+                }
+
+                // Line
+                drawPath(
+                    path = path,
+                    color = Color(0xFFBB86FC),
+                    style = Stroke(
+                        width = 6f,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+
+                // Points
+                sorted.forEachIndexed { index, entry ->
+                    val w = weights[index]
+                    val x = padding + stepX * index
+                    val normalized = (w - minWeight) / weightRange
+                    val y = padding + (1f - normalized.toFloat()) * height
+
+                    drawCircle(
+                        color = Color(0xFFFFFFFF),
+                        radius = 10f,
+                        center = Offset(x, y)
+                    )
+
+                    val isSelected = entry == selectedEntry
                     drawCircle(
                         color = if (isSelected) Color(0xFFBB86FC) else Color(0xFF000000),
                         radius = if (isSelected) 8f else 6f,
