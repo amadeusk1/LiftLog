@@ -71,6 +71,9 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     when (currentTab) {
                         LiftLogTab.PRS -> showAddPrDialog = true
                         LiftLogTab.BODYWEIGHT -> showAddBwDialog = true
+                        LiftLogTab.INFO -> {
+                            // No FAB action on Info screen (or add something later)
+                        }
                     }
                 }
             ) {
@@ -98,6 +101,11 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     selected = currentTab == LiftLogTab.BODYWEIGHT,
                     onClick = { currentTab = LiftLogTab.BODYWEIGHT },
                     text = { Text("Bodyweight") }
+                )
+                Tab(
+                    selected = currentTab == LiftLogTab.INFO,
+                    onClick = { currentTab = LiftLogTab.INFO },
+                    text = { Text("Info") }
                 )
             }
 
@@ -350,6 +358,13 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         }
                     }
                 }
+                LiftLogTab.INFO -> {
+                    InfoScreen()
+                }
+
+
+
+
             }
         }
     }
