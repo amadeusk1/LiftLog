@@ -19,7 +19,7 @@ enum class InfoSubTab {
 }
 
 @Composable
-fun InfoScreen() {
+fun ToolsScreen() {
     var currentSubTab by remember { mutableStateOf(InfoSubTab.TDEE) }
 
     Column(

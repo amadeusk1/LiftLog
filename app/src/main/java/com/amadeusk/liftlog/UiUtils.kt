@@ -10,7 +10,7 @@ import java.time.format.DateTimeParseException
 enum class LiftLogTab {
     PRS,
     BODYWEIGHT,
-    INFO
+    TOOLS
 }
 
 // ---- Time range for graph/history ----

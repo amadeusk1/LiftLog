@@ -71,9 +71,9 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     when (currentTab) {
                         LiftLogTab.PRS -> showAddPrDialog = true
                         LiftLogTab.BODYWEIGHT -> showAddBwDialog = true
-                        LiftLogTab.INFO -> {
+                            // LiftLogTab.TOOLS -> {
                             // No FAB action on Info screen (or add something later)
-                        }
+                       // }
                     }
                 }
             ) {
@@ -103,9 +103,9 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     text = { Text("Bodyweight") }
                 )
                 Tab(
-                    selected = currentTab == LiftLogTab.INFO,
-                    onClick = { currentTab = LiftLogTab.INFO },
-                    text = { Text("Info") }
+                    selected = currentTab == LiftLogTab.TOOLS,
+                    onClick = { currentTab = LiftLogTab.TOOLS },
+                    text = { Text("Tools") }
                 )
             }
 
@@ -358,8 +358,8 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         }
                     }
                 }
-                LiftLogTab.INFO -> {
-                    InfoScreen()
+                LiftLogTab.TOOLS -> {
+                    ToolsScreen()
                 }
 
 
@@ -479,7 +479,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // Edit bodyweight dialog
+    // Edit bodyweight dialogggg
     bwBeingEdited?.let { entry ->
         BodyWeightDialog(
             title = "Edit bodyweight",
@@ -505,4 +505,5 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             }
         )
     }
+
 }
