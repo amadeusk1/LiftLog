@@ -78,19 +78,4 @@ Users can add, edit, delete, and filter their entries directly from the interfac
 
 ---
 
-## Project Structure
-
-app/
-└── src/main/java/com/amadeusk/liftlog/
-├── MainActivity.kt
-├── appui/
-│ ├── LiftLogApp.kt
-│ ├── OverviewScreen.kt
-│ └── BodyWeightScreen.kt
-└── data/
-├── PR.kt
-├── BodyWeightEntry.kt
-├── WeightUnit.kt
-├── savePrsToFile.kt / loadPrsFromFile.kt
-├── saveUnitPreference.kt / loadUnitPreference.kt
 
