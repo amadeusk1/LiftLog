@@ -10,12 +10,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import kotlin.math.log10
+
 
 // Sub-tabs within the Info screen
 enum class InfoSubTab {
     TDEE,
     ONE_RM,
-    PROTEIN
+    PROTEIN,
+    BODY_FAT
 }
 
 @Composable
@@ -46,12 +49,18 @@ fun ToolsScreen() {
                 onClick = { currentSubTab = InfoSubTab.PROTEIN },
                 text = { Text("Protein") }
             )
+            Tab(
+                selected = currentSubTab == InfoSubTab.BODY_FAT,
+                onClick = { currentSubTab = InfoSubTab.BODY_FAT },
+                text = { Text("Body Fat %") }
+            )
         }
 
         when (currentSubTab) {
             InfoSubTab.TDEE -> TdeeCalculator()
             InfoSubTab.ONE_RM -> OneRmCalculator()
             InfoSubTab.PROTEIN -> ProteinNeedsCalculator()
+            InfoSubTab.BODY_FAT -> BodyFatCalculator()
         }
     }
 }
@@ -398,5 +407,250 @@ fun ProteinNeedsCalculator() {
         Text("- Aim for a good protein source in every meal (meat, eggs, dairy, whey, tofu, etc.).")
         Text("- More total calories > tiny differences in protein when bulking.")
         Text("- When cutting, higher protein helps keep muscle while losing fat.")
+    }
+}
+@Composable
+fun BodyFatCalculator() {
+    val scrollState = rememberScrollState()
+
+    // Shared for both methods
+    var isMale by remember { mutableStateOf(true) }
+
+    // BMI-based method inputs
+    var bmiHeightText by remember { mutableStateOf("") } // cm
+    var bmiWeightText by remember { mutableStateOf("") } // kg
+    var ageText by remember { mutableStateOf("") }       // years
+
+    // Navy method inputs
+    var heightText by remember { mutableStateOf("") } // cm
+    var neckText by remember { mutableStateOf("") }   // cm
+    var waistText by remember { mutableStateOf("") }  // cm (at navel)
+    var hipText by remember { mutableStateOf("") }    // cm (only for female)
+
+    // --- BMI-based estimate ---
+
+    val bmiHeightCm = bmiHeightText.toDoubleOrNull()
+    val bmiWeightKg = bmiWeightText.toDoubleOrNull()
+    val age = ageText.toIntOrNull()
+
+    val bmi = if (
+        bmiHeightCm != null && bmiHeightCm > 0.0 &&
+        bmiWeightKg != null && bmiWeightKg > 0.0
+    ) {
+        val hM = bmiHeightCm / 100.0
+        bmiWeightKg / (hM * hM)
+    } else null
+
+    // Deurenberg formula
+    // BF% = 1.20 * BMI + 0.23 * age - 10.8 * sex - 5.4
+    // sex: 1 = male, 0 = female
+    val bmiBodyFat = if (bmi != null && age != null && age in 16..80) {
+        val sexFactor = if (isMale) 1.0 else 0.0
+        1.20 * bmi + 0.23 * age - 10.8 * sexFactor - 5.4
+    } else null
+
+    // --- Navy tape method ---
+
+    val navyHeight = heightText.toDoubleOrNull()
+    val neck = neckText.toDoubleOrNull()
+    val waist = waistText.toDoubleOrNull()
+    val hip = hipText.toDoubleOrNull()
+
+    val hasAllMaleInputs =
+        isMale && navyHeight != null && neck != null && waist != null
+
+    val hasAllFemaleInputs =
+        !isMale && navyHeight != null && neck != null && waist != null && hip != null
+
+    val navyBodyFat: Double? = when {
+        hasAllMaleInputs && (waist!! - neck!!) > 0 -> {
+            val bodyDensity =
+                1.0324 -
+                        0.19077 * log10(waist - neck) +
+                        0.15456 * log10(navyHeight!!)
+            (495.0 / bodyDensity) - 450.0
+        }
+
+        hasAllFemaleInputs && (waist!! + hip!! - neck!!) > 0 -> {
+            val bodyDensity =
+                1.29579 -
+                        0.35004 * log10(waist + hip - neck) +
+                        0.22100 * log10(navyHeight!!)
+            (495.0 / bodyDensity) - 450.0
+        }
+
+        else -> null
+    }
+
+    val navyInvalidShapeMsg = when {
+        hasAllMaleInputs && waist != null && neck != null && (waist - neck) <= 0.0 ->
+            "Waist must be larger than neck for the Navy formula to work."
+        hasAllFemaleInputs && waist != null && hip != null && neck != null &&
+                (waist + hip - neck) <= 0.0 ->
+            "Waist + hip must be larger than neck for the Navy formula to work."
+        else -> null
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(scrollState),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Body Fat Percentage",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        // Sex toggle (used for both methods)
+        Text("Sex", style = MaterialTheme.typography.labelMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = isMale,
+                    onClick = { isMale = true }
+                )
+                Text("Male")
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                RadioButton(
+                    selected = !isMale,
+                    onClick = { isMale = false }
+                )
+                Text("Female")
+            }
+        }
+
+        // ------------------ BMI-BASED ESTIMATE ------------------
+        Divider()
+        Text(
+            text = "Quick estimate (from BMI)",
+            style = MaterialTheme.typography.labelLarge
+        )
+        Text(
+            text = "This uses BMI, age, and sex (Deurenberg formula). " +
+                    "Fast but less precise than the tape method below.",
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        OutlinedTextField(
+            value = bmiWeightText,
+            onValueChange = { bmiWeightText = it },
+            label = { Text("Body weight (kg)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = bmiHeightText,
+            onValueChange = { bmiHeightText = it },
+            label = { Text("Height (cm)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = ageText,
+            onValueChange = { ageText = it },
+            label = { Text("Age (years)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (bmi != null) {
+            Text("BMI: ${String.format("%.1f", bmi)}")
+        }
+
+        if (bmiBodyFat != null && !bmiBodyFat.isNaN() && !bmiBodyFat.isInfinite()) {
+            val formatted = String.format("%.1f", bmiBodyFat)
+            Text(
+                text = "Estimated body fat (BMI): $formatted%",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            Text(
+                text = "Enter weight, height, and age to get a BMI-based estimate.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        // ------------------ US NAVY TAPE METHOD ------------------
+        Divider()
+        Text(
+            text = "US Navy tape-measure method",
+            style = MaterialTheme.typography.labelLarge
+        )
+        Text(
+            text = "More detailed estimate based on circumference measurements. " +
+                    "Use a soft tape measure and measure in centimeters.",
+            style = MaterialTheme.typography.bodySmall
+        )
+
+        OutlinedTextField(
+            value = heightText,
+            onValueChange = { heightText = it },
+            label = { Text("Height (cm)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = neckText,
+            onValueChange = { neckText = it },
+            label = { Text("Neck (cm)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        OutlinedTextField(
+            value = waistText,
+            onValueChange = { waistText = it },
+            label = { Text("Waist (cm at navel)") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        if (!isMale) {
+            OutlinedTextField(
+                value = hipText,
+                onValueChange = { hipText = it },
+                label = { Text("Hip (cm at widest)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (navyBodyFat != null && !navyBodyFat.isNaN() && !navyBodyFat.isInfinite()) {
+            val formatted = String.format("%.1f", navyBodyFat)
+            Text(
+                text = "Estimated body fat (Navy): $formatted%",
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Tape-based estimates are often closer to calipers/DEXA than BMI-only formulas, " +
+                        "but still just an estimate.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        } else {
+            Text(
+                text = "Enter all measurements above to calculate a Navy-method estimate.",
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        navyInvalidShapeMsg?.let { msg ->
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = msg,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
     }
 }
