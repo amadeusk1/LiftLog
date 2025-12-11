@@ -79,7 +79,7 @@ fun InfoScreen() {
         // -------------------------
         // STEROID RESOURCES SECTION
         // -------------------------
-        SectionTitle("Steriods + Other Compounds Resources (Harm Reduction)")
+        SectionTitle("Steriods + Other Compounds Resources")
 
         ResourceCard(
             title = "ThinkSteroids — Articles",
@@ -109,7 +109,7 @@ fun InfoScreen() {
             style = MaterialTheme.typography.bodyMedium
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // -------------------------
         // TRAINING FUNDAMENTALS
