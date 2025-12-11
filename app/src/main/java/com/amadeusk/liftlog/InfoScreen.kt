@@ -91,11 +91,7 @@ fun InfoScreen() {
             url = "https://thinksteroids.com/community/",
             context = context
         )
-        ResourceCard(
-            title = "Steroid Source Talk",
-            url = "https://www.steroidsourcetalk.cc/index.php",
-            context = context
-        )
+
         ResourceCard(
             title = "Tanner Tattered FAQ (One of the best FAQ's)",
             url = "https://docs.google.com/document/d/12Lw3X20BPpSpd4iEiEad2FR-NF6r4GMs_Srw7zj1W4M/edit",
