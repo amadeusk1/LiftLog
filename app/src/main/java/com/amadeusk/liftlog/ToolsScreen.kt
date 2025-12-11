@@ -413,84 +413,97 @@ fun ProteinNeedsCalculator() {
 fun BodyFatCalculator() {
     val scrollState = rememberScrollState()
 
-    // Shared for both methods
+    // Unit selection
+    var useMetric by remember { mutableStateOf(true) }  // true = kg/cm, false = lb/in
+    val heightUnit = if (useMetric) "cm" else "in"
+    val weightUnit = if (useMetric) "kg" else "lb"
+
+    // Shared sex selection
     var isMale by remember { mutableStateOf(true) }
 
-    // BMI-based method inputs
-    var bmiHeightText by remember { mutableStateOf("") } // cm
-    var bmiWeightText by remember { mutableStateOf("") } // kg
-    var ageText by remember { mutableStateOf("") }       // years
+    // BMI method inputs
+    var bmiHeightText by remember { mutableStateOf("") }
+    var bmiWeightText by remember { mutableStateOf("") }
+    var ageText by remember { mutableStateOf("") }
 
     // Navy method inputs
-    var heightText by remember { mutableStateOf("") } // cm
-    var neckText by remember { mutableStateOf("") }   // cm
-    var waistText by remember { mutableStateOf("") }  // cm (at navel)
-    var hipText by remember { mutableStateOf("") }    // cm (only for female)
+    var heightText by remember { mutableStateOf("") }
+    var neckText by remember { mutableStateOf("") }
+    var waistText by remember { mutableStateOf("") }
+    var hipText by remember { mutableStateOf("") }
 
-    // --- BMI-based estimate ---
+    // Convert text → Double?
+    fun d(s: String) = s.toDoubleOrNull()
 
-    val bmiHeightCm = bmiHeightText.toDoubleOrNull()
-    val bmiWeightKg = bmiWeightText.toDoubleOrNull()
+    // -------------------------
+    // UNIT CONVERSION HELPERS
+    // -------------------------
+    fun toKg(v: Double) = if (useMetric) v else v * 0.45359237
+    fun toCm(v: Double) = if (useMetric) v else v * 2.54
+
+    // -------------------------
+    // BMI-BASED BODY FAT
+    // -------------------------
+    val bmiHeightCm = d(bmiHeightText)?.let { toCm(it) }
+    val bmiWeightKg = d(bmiWeightText)?.let { toKg(it) }
     val age = ageText.toIntOrNull()
 
-    val bmi = if (
-        bmiHeightCm != null && bmiHeightCm > 0.0 &&
-        bmiWeightKg != null && bmiWeightKg > 0.0
-    ) {
-        val hM = bmiHeightCm / 100.0
-        bmiWeightKg / (hM * hM)
+    val bmi = if (bmiHeightCm != null && bmiWeightKg != null && bmiHeightCm > 0) {
+        val m = bmiHeightCm / 100.0
+        bmiWeightKg / (m * m)
     } else null
 
-    // Deurenberg formula
-    // BF% = 1.20 * BMI + 0.23 * age - 10.8 * sex - 5.4
-    // sex: 1 = male, 0 = female
-    val bmiBodyFat = if (bmi != null && age != null && age in 16..80) {
+    val bmiBodyFat = if (bmi != null && age != null) {
         val sexFactor = if (isMale) 1.0 else 0.0
         1.20 * bmi + 0.23 * age - 10.8 * sexFactor - 5.4
     } else null
 
-    // --- Navy tape method ---
+    // -------------------------
+    // NAVY METHOD BODY FAT
+    // -------------------------
+    val navyHeight = d(heightText)?.let { toCm(it) }
+    val neck = d(neckText)?.let { toCm(it) }
+    val waist = d(waistText)?.let { toCm(it) }
+    val hip = d(hipText)?.let { toCm(it) }
 
-    val navyHeight = heightText.toDoubleOrNull()
-    val neck = neckText.toDoubleOrNull()
-    val waist = waistText.toDoubleOrNull()
-    val hip = hipText.toDoubleOrNull()
-
-    val hasAllMaleInputs =
+    val hasMaleInputs =
         isMale && navyHeight != null && neck != null && waist != null
 
-    val hasAllFemaleInputs =
+    val hasFemaleInputs =
         !isMale && navyHeight != null && neck != null && waist != null && hip != null
 
     val navyBodyFat: Double? = when {
-        hasAllMaleInputs && (waist!! - neck!!) > 0 -> {
-            val bodyDensity =
+        hasMaleInputs && (waist!! - neck!!) > 0 -> {
+            val density =
                 1.0324 -
                         0.19077 * log10(waist - neck) +
                         0.15456 * log10(navyHeight!!)
-            (495.0 / bodyDensity) - 450.0
+            (495.0 / density) - 450.0
         }
 
-        hasAllFemaleInputs && (waist!! + hip!! - neck!!) > 0 -> {
-            val bodyDensity =
+        hasFemaleInputs && (waist!! + hip!! - neck!!) > 0 -> {
+            val density =
                 1.29579 -
                         0.35004 * log10(waist + hip - neck) +
                         0.22100 * log10(navyHeight!!)
-            (495.0 / bodyDensity) - 450.0
+            (495.0 / density) - 450.0
         }
 
         else -> null
     }
 
-    val navyInvalidShapeMsg = when {
-        hasAllMaleInputs && waist != null && neck != null && (waist - neck) <= 0.0 ->
-            "Waist must be larger than neck for the Navy formula to work."
-        hasAllFemaleInputs && waist != null && hip != null && neck != null &&
-                (waist + hip - neck) <= 0.0 ->
-            "Waist + hip must be larger than neck for the Navy formula to work."
+    val invalidShape = when {
+        hasMaleInputs && waist != null && neck != null && (waist - neck) <= 0 ->
+            "Waist must be larger than neck for the Navy method."
+        hasFemaleInputs && waist != null && hip != null && neck != null &&
+                (waist + hip - neck) <= 0 ->
+            "Waist + hip must be larger than neck."
         else -> null
     }
 
+    // -------------------------
+    // UI
+    // -------------------------
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -498,49 +511,43 @@ fun BodyFatCalculator() {
             .verticalScroll(scrollState),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text(
-            text = "Body Fat Percentage",
-            style = MaterialTheme.typography.titleMedium
-        )
 
-        // Sex toggle (used for both methods)
-        Text("Sex", style = MaterialTheme.typography.labelMedium)
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = isMale,
-                    onClick = { isMale = true }
-                )
-                Text("Male")
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RadioButton(
-                    selected = !isMale,
-                    onClick = { isMale = false }
-                )
-                Text("Female")
-            }
+        Text("Body Fat Percentage", style = MaterialTheme.typography.titleMedium)
+
+        // UNIT TOGGLE
+        Text("Units", style = MaterialTheme.typography.labelMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = useMetric, onClick = { useMetric = true })
+            Text("Metric (kg / cm)")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(selected = !useMetric, onClick = { useMetric = false })
+            Text("Imperial (lb / in)")
         }
 
-        // ------------------ BMI-BASED ESTIMATE ------------------
+        // SEX TOGGLE
+        Text("Sex", style = MaterialTheme.typography.labelMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = isMale, onClick = { isMale = true })
+            Text("Male")
+            Spacer(modifier = Modifier.width(16.dp))
+            RadioButton(selected = !isMale, onClick = { isMale = false })
+            Text("Female")
+        }
+
+        // -------------------------
+        // BMI METHOD UI
+        // -------------------------
         Divider()
+        Text("Quick Estimate (BMI Method)", style = MaterialTheme.typography.labelLarge)
         Text(
-            text = "Quick estimate (from BMI)",
-            style = MaterialTheme.typography.labelLarge
-        )
-        Text(
-            text = "This uses BMI, age, and sex (Deurenberg formula). " +
-                    "Fast but less precise than the tape method below.",
+            "Fast estimate using BMI, age, and sex. Less precise than Navy method.",
             style = MaterialTheme.typography.bodySmall
         )
 
         OutlinedTextField(
             value = bmiWeightText,
             onValueChange = { bmiWeightText = it },
-            label = { Text("Body weight (kg)") },
+            label = { Text("Body weight ($weightUnit)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -548,7 +555,7 @@ fun BodyFatCalculator() {
         OutlinedTextField(
             value = bmiHeightText,
             onValueChange = { bmiHeightText = it },
-            label = { Text("Height (cm)") },
+            label = { Text("Height ($heightUnit)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -561,39 +568,28 @@ fun BodyFatCalculator() {
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (bmi != null) {
-            Text("BMI: ${String.format("%.1f", bmi)}")
-        }
+        bmi?.let { Text("BMI: ${String.format("%.1f", it)}") }
 
-        if (bmiBodyFat != null && !bmiBodyFat.isNaN() && !bmiBodyFat.isInfinite()) {
-            val formatted = String.format("%.1f", bmiBodyFat)
-            Text(
-                text = "Estimated body fat (BMI): $formatted%",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        } else {
-            Text(
-                text = "Enter weight, height, and age to get a BMI-based estimate.",
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
-        // ------------------ US NAVY TAPE METHOD ------------------
-        Divider()
-        Text(
-            text = "US Navy tape-measure method",
-            style = MaterialTheme.typography.labelLarge
-        )
-        Text(
-            text = "More detailed estimate based on circumference measurements. " +
-                    "Use a soft tape measure and measure in centimeters.",
+        bmiBodyFat?.let {
+            if (!it.isNaN() && !it.isInfinite()) {
+                Text("Estimated BF% (BMI): ${String.format("%.1f", it)}%")
+            }
+        } ?: Text(
+            "Enter weight, height, and age for BMI estimate.",
             style = MaterialTheme.typography.bodySmall
         )
+
+        // -------------------------
+        // NAVY METHOD UI
+        // -------------------------
+        Divider()
+        Text("US Navy Tape-Measure Method", style = MaterialTheme.typography.labelLarge)
+        Text("More accurate if measurements are correct.", style = MaterialTheme.typography.bodySmall)
 
         OutlinedTextField(
             value = heightText,
             onValueChange = { heightText = it },
-            label = { Text("Height (cm)") },
+            label = { Text("Height ($heightUnit)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -601,7 +597,7 @@ fun BodyFatCalculator() {
         OutlinedTextField(
             value = neckText,
             onValueChange = { neckText = it },
-            label = { Text("Neck (cm)") },
+            label = { Text("Neck ($heightUnit)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -609,7 +605,7 @@ fun BodyFatCalculator() {
         OutlinedTextField(
             value = waistText,
             onValueChange = { waistText = it },
-            label = { Text("Waist (cm at navel)") },
+            label = { Text("Waist ($heightUnit)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth()
         )
@@ -618,39 +614,26 @@ fun BodyFatCalculator() {
             OutlinedTextField(
                 value = hipText,
                 onValueChange = { hipText = it },
-                label = { Text("Hip (cm at widest)") },
+                label = { Text("Hip ($heightUnit)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
         if (navyBodyFat != null && !navyBodyFat.isNaN() && !navyBodyFat.isInfinite()) {
-            val formatted = String.format("%.1f", navyBodyFat)
             Text(
-                text = "Estimated body fat (Navy): $formatted%",
+                "Estimated BF% (Navy): ${String.format("%.1f", navyBodyFat)}%",
                 style = MaterialTheme.typography.headlineSmall
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Tape-based estimates are often closer to calipers/DEXA than BMI-only formulas, " +
-                        "but still just an estimate.",
-                style = MaterialTheme.typography.bodySmall
             )
         } else {
             Text(
-                text = "Enter all measurements above to calculate a Navy-method estimate.",
+                "Enter all tape measurements for Navy estimate.",
                 style = MaterialTheme.typography.bodySmall
             )
         }
 
-        navyInvalidShapeMsg?.let { msg ->
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = msg,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
+        invalidShape?.let {
+            Text(it, color = MaterialTheme.colorScheme.error)
         }
     }
 }
