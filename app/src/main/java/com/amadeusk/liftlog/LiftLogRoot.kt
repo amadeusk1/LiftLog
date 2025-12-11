@@ -66,18 +66,19 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    when (currentTab) {
-                        LiftLogTab.PRS -> showAddPrDialog = true
-                        LiftLogTab.BODYWEIGHT -> showAddBwDialog = true
-                            // LiftLogTab.TOOLS -> {
-                            // No FAB action on Info screen (or add something later)
-                       // }
+            // Only show FAB on PRS and BODYWEIGHT, not on TOOLS
+            if (currentTab != LiftLogTab.TOOLS) {
+                FloatingActionButton(
+                    onClick = {
+                        when (currentTab) {
+                            LiftLogTab.PRS -> showAddPrDialog = true
+                            LiftLogTab.BODYWEIGHT -> showAddBwDialog = true
+                            LiftLogTab.TOOLS -> { /* no-op */ }
+                        }
                     }
+                ) {
+                    Text("+")
                 }
-            ) {
-                Text("+")
             }
         }
     ) { innerPadding ->
