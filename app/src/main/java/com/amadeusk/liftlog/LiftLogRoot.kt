@@ -28,6 +28,11 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     var prBeingEdited by remember { mutableStateOf<PR?>(null) }
 
     val exercises = uiState.prs.map { it.exercise }.distinct()
+
+    // 🔹 NEW: always-available core lifts + previous exercises
+    val coreLifts = listOf("Bench Press", "Squat", "Deadlift")
+    val exerciseSuggestions = (coreLifts + exercises).distinct()
+
     var selectedExercise by remember(exercises) {
         mutableStateOf(exercises.firstOrNull())
     }
@@ -42,7 +47,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     var useKg by remember { mutableStateOf(true) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // NEW: Info page toggle
+    // Info page toggle
     var showInfoPage by remember { mutableStateOf(false) }
 
 
@@ -88,7 +93,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 .fillMaxSize()
         ) {
 
-            // NEW: If Info tab is active, show ONLY the InfoScreen
+            // If Info is active, show only Info screen
             if (showInfoPage) {
                 InfoScreen()
                 return@Column
@@ -121,8 +126,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             when (currentTab) {
 
                 LiftLogTab.PRS -> {
-                    // Your full PR page EXACTLY as before (unchanged)
-                    // --- keeping your original PR code ---
                     if (exercises.isNotEmpty()) {
                         ExerciseSelector(
                             exercises = exercises,
@@ -236,7 +239,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 }
 
                 LiftLogTab.BODYWEIGHT -> {
-                    // unchanged bodyweight page
                     if (bodyWeights.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
@@ -335,7 +337,8 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         }
     }
 
-    // --- dialogs unchanged below ---
+    // --- dialogs unchanged below, except we now pass exerciseSuggestions into PrDialog ---
+
     if (showSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
@@ -358,7 +361,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // PR and BW dialogs (unchanged)
+    // Add PR dialog
     if (showAddPrDialog) {
         PrDialog(
             title = "Add PR",
@@ -368,6 +371,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             initialReps = "",
             initialDate = "",
             useKg = useKg,
+            exerciseSuggestions = exerciseSuggestions,   // 🔹 NEW
             onDismiss = { showAddPrDialog = false },
             onConfirm = { exercise, weightStr, repsStr, date ->
                 val raw = weightStr.toDoubleOrNull() ?: 0.0
@@ -384,6 +388,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
+    // Edit PR dialog
     prBeingEdited?.let { pr ->
         PrDialog(
             title = "Edit PR",
@@ -393,6 +398,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             initialReps = pr.reps.toString(),
             initialDate = pr.date,
             useKg = useKg,
+            exerciseSuggestions = exerciseSuggestions,   // 🔹 NEW
             onDismiss = { prBeingEdited = null },
             onConfirm = { exercise, weightStr, repsStr, date ->
                 val newWeightKg = weightStr.toDoubleOrNull()?.fromDisplayWeight(useKg) ?: pr.weight
@@ -410,6 +416,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
+    // Bodyweight dialogs unchanged ...
     if (showAddBwDialog) {
         BodyWeightDialog(
             title = "Add bodyweight",
