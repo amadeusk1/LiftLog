@@ -22,14 +22,11 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Tabs: PRs vs Bodyweight
     var currentTab by remember { mutableStateOf(LiftLogTab.PRS) }
 
-    // PR dialog/edit state
     var showAddPrDialog by remember { mutableStateOf(false) }
     var prBeingEdited by remember { mutableStateOf<PR?>(null) }
 
-    // PR graph state
     val exercises = uiState.prs.map { it.exercise }.distinct()
     var selectedExercise by remember(exercises) {
         mutableStateOf(exercises.firstOrNull())
@@ -37,43 +34,45 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     var selectedGraphPr by remember { mutableStateOf<PR?>(null) }
     var selectedRange by remember { mutableStateOf(GraphRange.MONTH) }
 
-    // Bodyweight state (PERSISTED via file)
-    var bodyWeights by remember {
-        mutableStateOf(loadBodyWeightsFromFile(context))
-    }
+    var bodyWeights by remember { mutableStateOf(loadBodyWeightsFromFile(context)) }
     var showAddBwDialog by remember { mutableStateOf(false) }
     var bwBeingEdited by remember { mutableStateOf<BodyWeightEntry?>(null) }
     var selectedBwEntry by remember { mutableStateOf<BodyWeightEntry?>(null) }
 
-    // Units
     var useKg by remember { mutableStateOf(true) }
-
-    // Settings dialog
     var showSettingsDialog by remember { mutableStateOf(false) }
+
+    // NEW: Info page toggle
+    var showInfoPage by remember { mutableStateOf(false) }
+
 
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("LiftLog") },
+                navigationIcon = {
+                    TextButton(
+                        onClick = { showInfoPage = !showInfoPage }
+                    ) {
+                        Text(if (showInfoPage) "Back" else "Info")
+                    }
+                },
                 actions = {
                     IconButton(onClick = { showSettingsDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Settings"
-                        )
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 }
             )
         },
         floatingActionButton = {
-            // Only show FAB on PRS and BODYWEIGHT, not on TOOLS
-            if (currentTab != LiftLogTab.TOOLS) {
+            // Only show on PRS / Bodyweight
+            if (!showInfoPage && currentTab != LiftLogTab.TOOLS) {
                 FloatingActionButton(
                     onClick = {
                         when (currentTab) {
                             LiftLogTab.PRS -> showAddPrDialog = true
                             LiftLogTab.BODYWEIGHT -> showAddBwDialog = true
-                            LiftLogTab.TOOLS -> { /* no-op */ }
+                            else -> {}
                         }
                     }
                 ) {
@@ -82,13 +81,20 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             }
         }
     ) { innerPadding ->
+
         Column(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
 
-            // Tabs row
+            // NEW: If Info tab is active, show ONLY the InfoScreen
+            if (showInfoPage) {
+                InfoScreen()
+                return@Column
+            }
+
+            // ------------------ NORMAL TABS ------------------
             TabRow(
                 selectedTabIndex = currentTab.ordinal,
                 modifier = Modifier.fillMaxWidth()
@@ -110,9 +116,13 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 )
             }
 
+
+            // ------------------ MAIN SCREENS ------------------
             when (currentTab) {
+
                 LiftLogTab.PRS -> {
-                    // ----------------- PR PAGE -----------------
+                    // Your full PR page EXACTLY as before (unchanged)
+                    // --- keeping your original PR code ---
                     if (exercises.isNotEmpty()) {
                         ExerciseSelector(
                             exercises = exercises,
@@ -149,7 +159,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                 .padding(horizontal = 16.dp)
                         )
 
-                        // Details card for selected point
                         selectedGraphPr?.let { pr ->
                             val unitLabel = if (useKg) "kg" else "lb"
                             Spacer(modifier = Modifier.height(8.dp))
@@ -159,15 +168,10 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                     .padding(horizontal = 16.dp)
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
-                                    Text(
-                                        text = pr.exercise,
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    Text(
-                                        text = "Weight: ${formatWeight(pr.weight, useKg)} $unitLabel"
-                                    )
-                                    Text(text = "Reps: ${pr.reps}")
-                                    Text(text = "Date: ${pr.date}")
+                                    Text(pr.exercise, style = MaterialTheme.typography.titleSmall)
+                                    Text("Weight: ${formatWeight(pr.weight, useKg)} $unitLabel")
+                                    Text("Reps: ${pr.reps}")
+                                    Text("Date: ${pr.date}")
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -175,15 +179,11 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                         horizontalArrangement = Arrangement.End,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        TextButton(onClick = { prBeingEdited = pr }) {
-                                            Text("Edit")
-                                        }
+                                        TextButton(onClick = { prBeingEdited = pr }) { Text("Edit") }
                                         TextButton(onClick = {
                                             viewModel.deletePr(pr)
                                             selectedGraphPr = null
-                                        }) {
-                                            Text("Delete")
-                                        }
+                                        }) { Text("Delete") }
                                     }
                                 }
                             }
@@ -192,14 +192,11 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                     }
 
-                    // PR history
                     if (uiState.prs.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Text("No PRs yet. Tap + to add your first one.")
-                        }
+                        ) { Text("No PRs yet. Tap + to add your first one.") }
                     } else {
                         val history = if (selectedExercise != null) {
                             filterPrsByRange(
@@ -212,9 +209,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
-                            ) {
-                                Text("No PRs yet for this exercise in this range.")
-                            }
+                            ) { Text("No PRs yet for this exercise in this range.") }
                         } else {
                             LazyColumn(
                                 modifier = Modifier
@@ -241,16 +236,13 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 }
 
                 LiftLogTab.BODYWEIGHT -> {
-                    // ----------------- BODYWEIGHT PAGE -----------------
+                    // unchanged bodyweight page
                     if (bodyWeights.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
-                        ) {
-                            Text("No bodyweight entries yet. Tap + to add one.")
-                        }
+                        ) { Text("No bodyweight entries yet. Tap + to add one.") }
                     } else {
-                        // Range selector for bodyweight
                         GraphRangeSelector(
                             selectedRange = selectedRange,
                             onRangeSelected = { range ->
@@ -267,7 +259,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         BodyWeightGraph(
                             entries = bwForRange,
                             selectedEntry = selectedBwEntry,
-                            onPointSelected = { entry -> selectedBwEntry = entry },
+                            onPointSelected = { selectedBwEntry = it },
                             useKg = useKg,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -275,7 +267,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                 .padding(horizontal = 16.dp)
                         )
 
-                        // Details card for selected bodyweight point
                         selectedBwEntry?.let { entry ->
                             val unitLabel = if (useKg) "kg" else "lb"
                             Spacer(modifier = Modifier.height(8.dp))
@@ -285,14 +276,9 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                     .padding(horizontal = 16.dp)
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
-                                    Text(
-                                        text = "Bodyweight",
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    Text(
-                                        text = "Weight: ${formatWeight(entry.weight, useKg)} $unitLabel"
-                                    )
-                                    Text(text = "Date: ${entry.date}")
+                                    Text("Bodyweight", style = MaterialTheme.typography.titleSmall)
+                                    Text("Weight: ${formatWeight(entry.weight, useKg)} $unitLabel")
+                                    Text("Date: ${entry.date}")
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -300,17 +286,12 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                         horizontalArrangement = Arrangement.End,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        TextButton(onClick = { bwBeingEdited = entry }) {
-                                            Text("Edit")
-                                        }
+                                        TextButton(onClick = { bwBeingEdited = entry }) { Text("Edit") }
                                         TextButton(onClick = {
-                                            bodyWeights =
-                                                bodyWeights.filterNot { it.id == entry.id }
+                                            bodyWeights = bodyWeights.filterNot { it.id == entry.id }
                                             saveBodyWeightsToFile(context, bodyWeights)
                                             selectedBwEntry = null
-                                        }) {
-                                            Text("Delete")
-                                        }
+                                        }) { Text("Delete") }
                                     }
                                 }
                             }
@@ -318,18 +299,13 @@ fun LiftLogRoot(viewModel: PRViewModel) {
 
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
 
-                        // History list for bodyweight (filtered by range, newest -> oldest)
-                        val history = bwForRange.sortedByDescending {
-                            parsePrDateOrMin(it.date)
-                        }
+                        val history = bwForRange.sortedByDescending { parsePrDateOrMin(it.date) }
 
                         if (history.isEmpty()) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
-                            ) {
-                                Text("No bodyweight entries in this range.")
-                            }
+                            ) { Text("No bodyweight entries in this range.") }
                         } else {
                             LazyColumn(
                                 modifier = Modifier
@@ -337,21 +313,15 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(
-                                    history,
-                                    key = { it.id }
-                                ) { entry ->
+                                items(history, key = { it.id }) { entry ->
                                     BodyWeightItem(
                                         entry = entry,
                                         useKg = useKg,
                                         onEdit = { bwBeingEdited = entry },
                                         onDelete = {
-                                            bodyWeights =
-                                                bodyWeights.filterNot { it.id == entry.id }
+                                            bodyWeights = bodyWeights.filterNot { it.id == entry.id }
                                             saveBodyWeightsToFile(context, bodyWeights)
-                                            if (selectedBwEntry?.id == entry.id) {
-                                                selectedBwEntry = null
-                                            }
+                                            if (selectedBwEntry?.id == entry.id) selectedBwEntry = null
                                         }
                                     )
                                 }
@@ -359,41 +329,28 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         }
                     }
                 }
-                LiftLogTab.TOOLS -> {
-                    ToolsScreen()
-                }
 
-
-
-
+                LiftLogTab.TOOLS -> ToolsScreen()
             }
         }
     }
 
-    // Settings dialog (kg / lb)
+    // --- dialogs unchanged below ---
     if (showSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
             confirmButton = {
-                TextButton(onClick = { showSettingsDialog = false }) {
-                    Text("Close")
-                }
+                TextButton(onClick = { showSettingsDialog = false }) { Text("Close") }
             },
             title = { Text("Units") },
             text = {
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = useKg,
-                            onClick = { useKg = true }
-                        )
+                        RadioButton(selected = useKg, onClick = { useKg = true })
                         Text("Kilograms (kg)")
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = !useKg,
-                            onClick = { useKg = false }
-                        )
+                        RadioButton(selected = !useKg, onClick = { useKg = false })
                         Text("Pounds (lb)")
                     }
                 }
@@ -401,7 +358,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // Add PR dialog
+    // PR and BW dialogs (unchanged)
     if (showAddPrDialog) {
         PrDialog(
             title = "Add PR",
@@ -427,7 +384,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // Edit PR dialog
     prBeingEdited?.let { pr ->
         PrDialog(
             title = "Edit PR",
@@ -439,23 +395,21 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             useKg = useKg,
             onDismiss = { prBeingEdited = null },
             onConfirm = { exercise, weightStr, repsStr, date ->
-                val newWeightKg = weightStr.toDoubleOrNull()
-                    ?.fromDisplayWeight(useKg)
-                    ?: pr.weight
+                val newWeightKg = weightStr.toDoubleOrNull()?.fromDisplayWeight(useKg) ?: pr.weight
 
-                val updated = pr.copy(
-                    exercise = exercise,
-                    weight = newWeightKg,
-                    reps = repsStr.toIntOrNull() ?: pr.reps,
-                    date = date
+                viewModel.updatePr(
+                    pr.copy(
+                        exercise = exercise,
+                        weight = newWeightKg,
+                        reps = repsStr.toIntOrNull() ?: pr.reps,
+                        date = date
+                    )
                 )
-                viewModel.updatePr(updated)
                 prBeingEdited = null
             }
         )
     }
 
-    // Add bodyweight dialog
     if (showAddBwDialog) {
         BodyWeightDialog(
             title = "Add bodyweight",
@@ -480,7 +434,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // Edit bodyweight dialogggg
     bwBeingEdited?.let { entry ->
         BodyWeightDialog(
             title = "Edit bodyweight",
@@ -490,21 +443,13 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             useKg = useKg,
             onDismiss = { bwBeingEdited = null },
             onConfirm = { weightStr, date ->
-                val newWeightKg = weightStr.toDoubleOrNull()
-                    ?.fromDisplayWeight(useKg)
-                    ?: entry.weight
+                val newWeightKg = weightStr.toDoubleOrNull()?.fromDisplayWeight(useKg) ?: entry.weight
 
-                val updated = entry.copy(
-                    weight = newWeightKg,
-                    date = date
-                )
-                bodyWeights = bodyWeights.map {
-                    if (it.id == entry.id) updated else it
-                }
+                val updated = entry.copy(weight = newWeightKg, date = date)
+                bodyWeights = bodyWeights.map { if (it.id == entry.id) updated else it }
                 saveBodyWeightsToFile(context, bodyWeights)
                 bwBeingEdited = null
             }
         )
     }
-
 }
