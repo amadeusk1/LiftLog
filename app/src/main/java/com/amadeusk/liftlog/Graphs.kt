@@ -27,142 +27,22 @@ fun ExerciseGraph(
     useKg: Boolean,
     modifier: Modifier = Modifier
 ) {
-    if (prs.size < 2) {
-        Column(modifier = modifier) {
-            Text(
-                text = "Not enough data to draw a graph yet.",
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        return
-    }
-
-    // Sort by user-input date so the graph goes left → right in chronological order
     val sorted = remember(prs) {
-        prs.sortedWith(
-            compareBy<PR> { parsePrDateOrMin(it.date) }
-                .thenBy { it.id }
-        )
+        prs.sortedWith(compareBy<PR> { parsePrDateOrMin(it.date) }.thenBy { it.id })
     }
 
-    Column(modifier = modifier) {
-        Text(
-            text = "PR Progress",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(sorted, useKg) {
-                    detectTapGestures { tapOffset ->
-                        val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
-                        val maxWeight = weights.maxOrNull() ?: 0.0
-                        val minWeight = weights.minOrNull() ?: 0.0
-                        val weightRange =
-                            (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
-
-                        val padding = 32f
-                        val width = size.width.toFloat() - 2 * padding
-                        val height = size.height.toFloat() - 2 * padding
-                        val stepX = width / (sorted.size - 1).coerceAtLeast(1)
-
-                        val points = sorted.mapIndexed { index, pr ->
-                            val w = weights[index]
-                            val x = padding + stepX * index
-                            val normalized = (w - minWeight) / weightRange
-                            val y = padding + (1f - normalized.toFloat()) * height
-                            Offset(x, y) to pr
-                        }
-
-                        val hit = points.minByOrNull { (center, _) ->
-                            hypot(
-                                center.x - tapOffset.x,
-                                center.y - tapOffset.y
-                            )
-                        }
-
-                        val hitRadiusPx = 80f // forgiving tap radius
-                        if (hit != null) {
-                            val (center, pr) = hit
-                            val distance = hypot(
-                                center.x - tapOffset.x,
-                                center.y - tapOffset.y
-                            )
-                            if (distance <= hitRadiusPx) {
-                                onPointSelected(pr)
-                            }
-                        }
-                    }
-                }
-        ) {
-            Canvas(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
-                val maxWeight = weights.maxOrNull() ?: 0.0
-                val minWeight = weights.minOrNull() ?: 0.0
-                val weightRange =
-                    (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
-
-                val padding = 32f
-                val width = size.width - 2 * padding
-                val height = size.height - 2 * padding
-                val stepX = width / (sorted.size - 1).coerceAtLeast(1)
-
-                val path = Path()
-
-                sorted.forEachIndexed { index, pr ->
-                    val w = weights[index]
-                    val x = padding + stepX * index
-                    val normalized = (w - minWeight) / weightRange
-                    val y = padding + (1f - normalized.toFloat()) * height
-
-                    if (index == 0) {
-                        path.moveTo(x, y)
-                    } else {
-                        path.lineTo(x, y)
-                    }
-                }
-
-                // Line
-                drawPath(
-                    path = path,
-                    color = Color(0xFFBB86FC),
-                    style = Stroke(
-                        width = 6f,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round
-                    )
-                )
-
-                // Points
-                sorted.forEachIndexed { index, pr ->
-                    val w = weights[index]
-                    val x = padding + stepX * index
-                    val normalized = (w - minWeight) / weightRange
-                    val y = padding + (1f - normalized.toFloat()) * height
-
-                    // Outer circle
-                    drawCircle(
-                        color = Color(0xFFFFFFFF),
-                        radius = 10f,
-                        center = Offset(x, y)
-                    )
-
-                    // Inner circle (highlight if selected)
-                    val isSelected = pr == selectedPr
-                    drawCircle(
-                        color = if (isSelected) Color(0xFFBB86FC) else Color(0xFF000000),
-                        radius = if (isSelected) 8f else 6f,
-                        center = Offset(x, y)
-                    )
-                }
-            }
-        }
-    }
+    ProfessionalLineChart(
+        title = "PR Progress",
+        items = sorted,
+        selected = selectedPr,
+        onSelected = onPointSelected,
+        getValue = { it.weight.toDisplayWeight(useKg) },
+        getLabel = { shortDateLabel(it.date) }, // implement below
+        formatValue = { v -> formatWeight(v, useKg) },
+        modifier = modifier.fillMaxWidth()
+    )
 }
+
 
 @Composable
 fun BodyWeightGraph(
@@ -172,136 +52,35 @@ fun BodyWeightGraph(
     useKg: Boolean,
     modifier: Modifier = Modifier
 ) {
-    if (entries.size < 2) {
-        Column(modifier = modifier) {
-            Text(
-                text = "Not enough data to draw a graph yet.",
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-        return
-    }
-
     val sorted = remember(entries) {
-        entries.sortedWith(
-            compareBy<BodyWeightEntry> { parsePrDateOrMin(it.date) }
-                .thenBy { it.id }
-        )
+        entries.sortedWith(compareBy<BodyWeightEntry> { parsePrDateOrMin(it.date) }.thenBy { it.id })
     }
 
-    Column(modifier = modifier) {
-        Text(
-            text = "Bodyweight Progress",
-            style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(sorted, useKg) {
-                    detectTapGestures { tapOffset ->
-                        val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
-                        val maxWeight = weights.maxOrNull() ?: 0.0
-                        val minWeight = weights.minOrNull() ?: 0.0
-                        val weightRange =
-                            (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
-
-                        val padding = 32f
-                        val width = size.width.toFloat() - 2 * padding
-                        val height = size.height.toFloat() - 2 * padding
-                        val stepX = width / (sorted.size - 1).coerceAtLeast(1)
-
-                        val points = sorted.mapIndexed { index, entry ->
-                            val w = weights[index]
-                            val x = padding + stepX * index
-                            val normalized = (w - minWeight) / weightRange
-                            val y = padding + (1f - normalized.toFloat()) * height
-                            Offset(x, y) to entry
-                        }
-
-                        val hit = points.minByOrNull { (center, _) ->
-                            hypot(
-                                center.x - tapOffset.x,
-                                center.y - tapOffset.y
-                            )
-                        }
-
-                        val hitRadiusPx = 80f
-                        if (hit != null) {
-                            val (center, entry) = hit
-                            val distance = hypot(
-                                center.x - tapOffset.x,
-                                center.y - tapOffset.y
-                            )
-                            if (distance <= hitRadiusPx) {
-                                onPointSelected(entry)
-                            }
-                        }
-                    }
-                }
-        ) {
-            Canvas(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val weights = sorted.map { it.weight.toDisplayWeight(useKg) }
-                val maxWeight = weights.maxOrNull() ?: 0.0
-                val minWeight = weights.minOrNull() ?: 0.0
-                val weightRange =
-                    (maxWeight - minWeight).takeIf { it != 0.0 } ?: 1.0
-
-                val padding = 32f
-                val width = size.width - 2 * padding
-                val height = size.height - 2 * padding
-                val stepX = width / (sorted.size - 1).coerceAtLeast(1)
-
-                val path = Path()
-
-                sorted.forEachIndexed { index, entry ->
-                    val w = weights[index]
-                    val x = padding + stepX * index
-                    val normalized = (w - minWeight) / weightRange
-                    val y = padding + (1f - normalized.toFloat()) * height
-
-                    if (index == 0) {
-                        path.moveTo(x, y)
-                    } else {
-                        path.lineTo(x, y)
-                    }
-                }
-
-                // Line
-                drawPath(
-                    path = path,
-                    color = Color(0xFFBB86FC),
-                    style = Stroke(
-                        width = 6f,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round
-                    )
-                )
-
-                // Points
-                sorted.forEachIndexed { index, entry ->
-                    val w = weights[index]
-                    val x = padding + stepX * index
-                    val normalized = (w - minWeight) / weightRange
-                    val y = padding + (1f - normalized.toFloat()) * height
-
-                    drawCircle(
-                        color = Color(0xFFFFFFFF),
-                        radius = 10f,
-                        center = Offset(x, y)
-                    )
-
-                    val isSelected = entry == selectedEntry
-                    drawCircle(
-                        color = if (isSelected) Color(0xFFBB86FC) else Color(0xFF000000),
-                        radius = if (isSelected) 8f else 6f,
-                        center = Offset(x, y)
-                    )
-                }
-            }
-        }
-    }
+    ProfessionalLineChart(
+        title = "Bodyweight Progress",
+        items = sorted,
+        selected = selectedEntry,
+        onSelected = onPointSelected,
+        getValue = { it.weight.toDisplayWeight(useKg) },
+        getLabel = { shortDateLabel(it.date) },
+        formatValue = { v -> formatWeight(v, useKg) },
+        modifier = modifier.fillMaxWidth()
+    )
 }
+
+fun formatWeight(v: Double, useKg: Boolean): String {
+    val unit = if (useKg) "kg" else "lb"
+    return "${"%.1f".format(v)} $unit"
+}
+
+// If your stored date is already like "2025-12-17", this will show "12/17".
+// If your date format differs, adjust parsing accordingly.
+private fun shortDateLabel(date: String): String {
+    // dumb-safe fallback: keep last 5 chars if it looks like yyyy-mm-dd
+    return if (date.length >= 10 && date[4] == '-' && date[7] == '-') {
+        val mm = date.substring(5, 7)
+        val dd = date.substring(8, 10)
+        "$mm/$dd"
+    } else date
+}
+

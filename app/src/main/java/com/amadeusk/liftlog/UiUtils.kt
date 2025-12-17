@@ -85,7 +85,9 @@ fun Double.toDisplayWeight(useKg: Boolean): Double =
 fun Double.fromDisplayWeight(useKg: Boolean): Double =
     if (useKg) this else this * LB_TO_KG
 
+/*
 fun formatWeight(weightKg: Double, useKg: Boolean): String {
     val v = weightKg.toDisplayWeight(useKg)
     return String.format("%.1f", v)
 }
+*/
