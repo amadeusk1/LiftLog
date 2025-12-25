@@ -1,16 +1,23 @@
 package com.amadeusk.liftlog
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.amadeusk.liftlog.data.BodyWeightEntry
 import com.amadeusk.liftlog.data.PR
-import androidx.compose.ui.Alignment
-
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 // ---------- Selectors & Range ----------
 
@@ -107,9 +114,7 @@ fun PRItem(
     onEdit: () -> Unit
 ) {
     val unitLabel = if (useKg) "kg" else "lb"
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .padding(12.dp)
@@ -119,18 +124,12 @@ fun PRItem(
         ) {
             Column {
                 Text(text = pr.exercise, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "${formatWeight(pr.weight, useKg)} $unitLabel x ${pr.reps} reps"
-                )
+                Text(text = "${formatWeight(pr.weight, useKg)} $unitLabel x ${pr.reps} reps")
                 Text(text = pr.date, style = MaterialTheme.typography.bodySmall)
             }
             Row {
-                TextButton(onClick = onEdit) {
-                    Text("Edit")
-                }
-                TextButton(onClick = onDelete) {
-                    Text("Delete")
-                }
+                TextButton(onClick = onEdit) { Text("Edit") }
+                TextButton(onClick = onDelete) { Text("Delete") }
             }
         }
     }
@@ -144,9 +143,7 @@ fun BodyWeightItem(
     onDelete: () -> Unit
 ) {
     val unitLabel = if (useKg) "kg" else "lb"
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
+    Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .padding(12.dp)
@@ -160,21 +157,72 @@ fun BodyWeightItem(
                     text = "${formatWeight(entry.weight, useKg)} $unitLabel",
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Text(
-                    text = entry.date,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                Text(text = entry.date, style = MaterialTheme.typography.bodySmall)
             }
             Row {
-                TextButton(onClick = onEdit) {
-                    Text("Edit")
-                }
-                TextButton(onClick = onDelete) {
-                    Text("Delete")
-                }
+                TextButton(onClick = onEdit) { Text("Edit") }
+                TextButton(onClick = onDelete) { Text("Delete") }
             }
         }
     }
+}
+
+// ---------- Date Field (Manual typing + Calendar Picker) ----------
+
+@Composable
+private fun DateTextFieldWithCalendar(
+    label: String,
+    dateText: String,
+    onDateTextChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE } // yyyy-MM-dd
+
+    // If the user typed a valid date, use it as the initial picker value, otherwise default to today.
+    val initialDate = remember(dateText) {
+        runCatching { LocalDate.parse(dateText, formatter) }.getOrElse { LocalDate.now(ZoneId.systemDefault()) }
+    }
+
+    // Simple validation (optional): show red if invalid and not blank
+    val isValid = remember(dateText) {
+        dateText.isBlank() || runCatching { LocalDate.parse(dateText, formatter) }.isSuccess
+    }
+
+    OutlinedTextField(
+        value = dateText,
+        onValueChange = { onDateTextChange(it) }, // ✅ manual typing enabled
+        label = { Text(label) },
+        modifier = modifier.fillMaxWidth(),
+        singleLine = true,
+        isError = !isValid,
+        supportingText = {
+            if (!isValid) Text("Use format YYYY-MM-DD")
+            else Text("Format: YYYY-MM-DD")
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        trailingIcon = {
+            IconButton(
+                onClick = {
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, dayOfMonth ->
+                            val picked = LocalDate.of(year, month + 1, dayOfMonth)
+                            onDateTextChange(picked.format(formatter))
+                        },
+                        initialDate.year,
+                        initialDate.monthValue - 1,
+                        initialDate.dayOfMonth
+                    ).show()
+                }
+            ) {
+                Icon(Icons.Filled.DateRange, contentDescription = "Pick date")
+            }
+        }
+    )
 }
 
 // ---------- Dialogs ----------
@@ -206,19 +254,19 @@ fun PrDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
                 OutlinedTextField(
                     value = exercise,
                     onValueChange = { exercise = it },
                     label = { Text("Exercise (e.g. Bench Press)") },
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { weight = it },
@@ -226,6 +274,7 @@ fun PrDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+
                 OutlinedTextField(
                     value = reps,
                     onValueChange = { reps = it },
@@ -233,11 +282,11 @@ fun PrDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = date,
-                    onValueChange = { date = it },
-                    label = { Text("Date (e.g. 2025-12-10)") },
-                    modifier = Modifier.fillMaxWidth()
+
+                DateTextFieldWithCalendar(
+                    label = "Date",
+                    dateText = date,
+                    onDateTextChange = { date = it }
                 )
             }
         }
@@ -267,13 +316,12 @@ fun BodyWeightDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { weight = it },
@@ -281,11 +329,11 @@ fun BodyWeightDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = date,
-                    onValueChange = { date = it },
-                    label = { Text("Date (e.g. 2025-12-10)") },
-                    modifier = Modifier.fillMaxWidth()
+
+                DateTextFieldWithCalendar(
+                    label = "Date",
+                    dateText = date,
+                    onDateTextChange = { date = it }
                 )
             }
         }
