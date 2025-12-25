@@ -164,7 +164,7 @@ fun PrDialog(
                         when {
                             weightText.isBlank() -> Text("Required")
                             !isWeightValid -> Text("Enter a number > 0")
-                            else -> Text("OK")
+                            else -> Text("")
                         }
                     },
                     keyboardOptions = KeyboardOptions(
@@ -185,7 +185,7 @@ fun PrDialog(
                         when {
                             repsText.isBlank() -> Text("Required")
                             !isRepsValid -> Text("Enter a whole number > 0")
-                            else -> Text("OK")
+                            else -> Text("")
                         }
                     },
                     keyboardOptions = KeyboardOptions(
@@ -234,7 +234,7 @@ private fun DateTextFieldWithCalendar(
             when {
                 dateText.isBlank() -> Text("Required (YYYY-MM-DD)")
                 !isValid -> Text("Use format YYYY-MM-DD")
-                else -> Text("OK")
+                else -> Text("")
             }
         },
         keyboardOptions = KeyboardOptions(

@@ -180,12 +180,12 @@ private fun DateTextFieldWithCalendar(
     val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE } // yyyy-MM-dd
 
     val initialDate = remember(dateText) {
-        runCatching { LocalDate.parse(dateText, formatter) }
+        runCatching { LocalDate.parse(dateText.trim(), formatter) }
             .getOrElse { LocalDate.now(ZoneId.systemDefault()) }
     }
 
     val isValid = remember(dateText) {
-        dateText.isBlank() || runCatching { LocalDate.parse(dateText, formatter) }.isSuccess
+        dateText.isNotBlank() && runCatching { LocalDate.parse(dateText.trim(), formatter) }.isSuccess
     }
 
     OutlinedTextField(
@@ -194,10 +194,13 @@ private fun DateTextFieldWithCalendar(
         label = { Text(label) },
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
-        isError = !isValid,
+        isError = dateText.isNotBlank() && !isValid,
         supportingText = {
-            if (!isValid) Text("Use format YYYY-MM-DD")
-            else Text("Format: YYYY-MM-DD")
+            when {
+                dateText.isBlank() -> Text("Required (YYYY-MM-DD)")
+                !isValid -> Text("Use format YYYY-MM-DD")
+                else -> Text("")
+            }
         },
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
@@ -245,10 +248,24 @@ fun PrDialog(
 
     val unitLabel = if (useKg) "kg" else "lb"
 
+    // validation
+    val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
+    val isDateValid = remember(date) {
+        runCatching { LocalDate.parse(date.trim(), formatter) }.isSuccess
+    }
+    val weightVal = remember(weight) { weight.trim().toDoubleOrNull() }
+    val repsVal = remember(reps) { reps.trim().toIntOrNull() }
+    val isWeightValid = weightVal != null && weightVal > 0.0
+    val isRepsValid = repsVal != null && repsVal > 0
+    val canSave = isDateValid && isWeightValid && isRepsValid
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = { onConfirm(exercise, weight, reps, date) }) {
+            TextButton(
+                enabled = canSave,
+                onClick = { onConfirm(exercise, weight, reps, date) }
+            ) {
                 Text(confirmButtonText)
             }
         },
@@ -270,19 +287,36 @@ fun PrDialog(
                     value = weight,
                     onValueChange = { weight = it },
                     label = { Text("Weight ($unitLabel)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = weight.isNotBlank() && !isWeightValid,
+                    supportingText = {
+                        when {
+                            weight.isBlank() -> Text("Required")
+                            !isWeightValid -> Text("Enter a number > 0")
+                            else -> Text("")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
 
                 OutlinedTextField(
                     value = reps,
                     onValueChange = { reps = it },
                     label = { Text("Reps") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = reps.isNotBlank() && !isRepsValid,
+                    supportingText = {
+                        when {
+                            reps.isBlank() -> Text("Required")
+                            !isRepsValid -> Text("Enter a whole number > 0")
+                            else -> Text("")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
 
-                // ✅ Same modern date selector as BodyWeightDialog (manual typing + calendar)
                 DateTextFieldWithCalendar(
                     label = "Date",
                     dateText = date,
@@ -307,11 +341,24 @@ fun BodyWeightDialog(
     var date by remember { mutableStateOf(initialDate) }
 
     val unitLabel = if (useKg) "kg" else "lb"
+    val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
+
+    // ✅ Validation: date must be valid, weight must be numeric > 0
+    val isDateValid = remember(date) {
+        runCatching { LocalDate.parse(date.trim(), formatter) }.isSuccess
+    }
+    val weightVal = remember(weight) { weight.trim().toDoubleOrNull() }
+    val isWeightValid = weightVal != null && weightVal > 0.0
+
+    val canSave = isDateValid && isWeightValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = { onConfirm(weight, date) }) {
+            TextButton(
+                enabled = canSave,
+                onClick = { onConfirm(weight.trim(), date.trim()) }
+            ) {
                 Text(confirmButtonText)
             }
         },
@@ -326,8 +373,20 @@ fun BodyWeightDialog(
                     value = weight,
                     onValueChange = { weight = it },
                     label = { Text("Weight ($unitLabel)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = weight.isNotBlank() && !isWeightValid,
+                    supportingText = {
+                        when {
+                            weight.isBlank() -> Text("Required")
+                            !isWeightValid -> Text("Enter a number > 0")
+                            else -> Text("")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Next
+                    )
                 )
 
                 DateTextFieldWithCalendar(
