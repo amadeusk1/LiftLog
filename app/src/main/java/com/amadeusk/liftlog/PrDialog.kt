@@ -1,28 +1,37 @@
 package com.amadeusk.liftlog
 
+import android.app.DatePickerDialog
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-//import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-//import androidx.compose.material3.menuAnchor
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue          // 🔹 needed for `by remember`
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue        // 🔹 needed for `by remember`
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.MaterialTheme
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrDialog(
     title: String,
@@ -36,15 +45,15 @@ fun PrDialog(
     onDismiss: () -> Unit,
     onConfirm: (exercise: String, weightStr: String, repsStr: String, date: String) -> Unit
 ) {
-    // Decide how to initialize selection vs custom
     val coreLifts = listOf("Bench Press", "Squat", "Deadlift")
     val allSuggestions = (coreLifts + exerciseSuggestions).distinct()
 
-    val initialSelectedFromList = if (initialExercise in allSuggestions) initialExercise else ""
-    val initialCustom = if (initialExercise in allSuggestions) "" else initialExercise
-
-    var selectedExercise by remember { mutableStateOf(initialSelectedFromList) }
-    var customExerciseText by remember { mutableStateOf(initialCustom) }
+    var selectedExercise by remember {
+        mutableStateOf(if (initialExercise in allSuggestions) initialExercise else "")
+    }
+    var customExerciseText by remember {
+        mutableStateOf(if (initialExercise in allSuggestions) "" else initialExercise)
+    }
 
     var weightText by remember { mutableStateOf(initialWeight) }
     var repsText by remember { mutableStateOf(initialReps) }
@@ -53,17 +62,31 @@ fun PrDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
 
     val weightLabel = if (useKg) "Weight (kg)" else "Weight (lb)"
+    val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
+
+    // ----- Validation -----
+    val isDateValid = remember(dateText) {
+        runCatching { LocalDate.parse(dateText.trim(), formatter) }.isSuccess
+    }
+
+    val weightValue = remember(weightText) { weightText.trim().toDoubleOrNull() }
+    val repsValue = remember(repsText) { repsText.trim().toIntOrNull() }
+
+    // require > 0 (feel free to relax if you want 0 allowed)
+    val isWeightValid = weightValue != null && weightValue > 0.0
+    val isRepsValid = repsValue != null && repsValue > 0
+
+    val canSave = isDateValid && isWeightValid && isRepsValid
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(
+                enabled = canSave, // 🔒 Block save unless date+weight+reps valid
                 onClick = {
-                    val finalExercise = if (customExerciseText.isNotBlank()) {
-                        customExerciseText.trim()
-                    } else {
-                        selectedExercise.trim()
-                    }
+                    val finalExercise =
+                        if (customExerciseText.isNotBlank()) customExerciseText.trim()
+                        else selectedExercise.trim()
 
                     onConfirm(
                         finalExercise,
@@ -72,44 +95,41 @@ fun PrDialog(
                         dateText.trim()
                     )
                 }
-            ) {
-                Text(confirmButtonText)
-            }
+            ) { Text(confirmButtonText) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         title = { Text(title) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
 
-                // Dropdown selection (from list)
-                ExposedDropdownMenuBox(
-                    expanded = dropdownExpanded,
-                    onExpandedChange = { dropdownExpanded = !dropdownExpanded }
-                ) {
+                // ---------- Exercise dropdown ----------
+                Box(modifier = Modifier.fillMaxWidth()) {
+
                     OutlinedTextField(
                         value = selectedExercise,
-                        onValueChange = { /* read-only via menu */ },
+                        onValueChange = {},
                         readOnly = true,
                         label = { Text("Exercise (from list)") },
-                        supportingText = {
-                            Text("Tap to pick a common or previous exercise")
-                        },
+                        supportingText = { Text("Tap to pick a common or previous exercise") },
                         modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true },
                         trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded)
-                        },
-                        colors = ExposedDropdownMenuDefaults.textFieldColors()
+                            IconButton(onClick = { dropdownExpanded = true }) {
+                                Icon(
+                                    Icons.Filled.ArrowDropDown,
+                                    contentDescription = "Open exercise list"
+                                )
+                            }
+                        }
                     )
 
-                    ExposedDropdownMenu(
+                    DropdownMenu(
                         expanded = dropdownExpanded,
-                        onDismissRequest = { dropdownExpanded = false }
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         allSuggestions.forEach { suggestion ->
                             DropdownMenuItem(
@@ -123,35 +143,120 @@ fun PrDialog(
                     }
                 }
 
-                // Custom exercise text field (takes priority if filled)
+                // ---------- Custom exercise ----------
                 OutlinedTextField(
                     value = customExerciseText,
                     onValueChange = { customExerciseText = it },
-                    label = { Text("Or custom exercise name") },
-                    supportingText = { Text("If not in the list above, type it here") },
+                    label = { Text("Or custom exercise") },
+                    supportingText = { Text("Overrides list selection if filled") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // ---------- Weight (numeric required) ----------
                 OutlinedTextField(
                     value = weightText,
                     onValueChange = { weightText = it },
                     label = { Text(weightLabel) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = weightText.isNotBlank() && !isWeightValid,
+                    supportingText = {
+                        when {
+                            weightText.isBlank() -> Text("Required")
+                            !isWeightValid -> Text("Enter a number > 0")
+                            else -> Text("OK")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number, // allows decimals on most keyboards
+                        imeAction = ImeAction.Next
+                    )
                 )
 
+                // ---------- Reps (integer required) ----------
                 OutlinedTextField(
                     value = repsText,
                     onValueChange = { repsText = it },
                     label = { Text("Reps") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = repsText.isNotBlank() && !isRepsValid,
+                    supportingText = {
+                        when {
+                            repsText.isBlank() -> Text("Required")
+                            !isRepsValid -> Text("Enter a whole number > 0")
+                            else -> Text("OK")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Next
+                    )
                 )
 
-                OutlinedTextField(
-                    value = dateText,
-                    onValueChange = { dateText = it },
-                    label = { Text("Date (e.g. 2025-01-01)") },
-                    modifier = Modifier.fillMaxWidth()
+                // ---------- Date (valid ISO required) ----------
+                DateTextFieldWithCalendar(
+                    label = "Date",
+                    dateText = dateText,
+                    onDateTextChange = { dateText = it }
                 )
+            }
+        }
+    )
+}
+
+@Composable
+private fun DateTextFieldWithCalendar(
+    label: String,
+    dateText: String,
+    onDateTextChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
+
+    val initialDate = remember(dateText) {
+        runCatching { LocalDate.parse(dateText.trim(), formatter) }
+            .getOrElse { LocalDate.now(ZoneId.systemDefault()) }
+    }
+
+    val isValid = remember(dateText) {
+        runCatching { LocalDate.parse(dateText.trim(), formatter) }.isSuccess
+    }
+
+    OutlinedTextField(
+        value = dateText,
+        onValueChange = onDateTextChange,
+        label = { Text(label) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        isError = dateText.isNotBlank() && !isValid,
+        supportingText = {
+            when {
+                dateText.isBlank() -> Text("Required (YYYY-MM-DD)")
+                !isValid -> Text("Use format YYYY-MM-DD")
+                else -> Text("OK")
+            }
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        trailingIcon = {
+            IconButton(
+                onClick = {
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            val picked = LocalDate.of(year, month + 1, day)
+                            onDateTextChange(picked.format(formatter))
+                        },
+                        initialDate.year,
+                        initialDate.monthValue - 1,
+                        initialDate.dayOfMonth
+                    ).show()
+                }
+            ) {
+                Icon(Icons.Filled.DateRange, contentDescription = "Pick date")
             }
         }
     )

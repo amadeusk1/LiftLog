@@ -179,19 +179,18 @@ private fun DateTextFieldWithCalendar(
     val context = LocalContext.current
     val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE } // yyyy-MM-dd
 
-    // If the user typed a valid date, use it as the initial picker value, otherwise default to today.
     val initialDate = remember(dateText) {
-        runCatching { LocalDate.parse(dateText, formatter) }.getOrElse { LocalDate.now(ZoneId.systemDefault()) }
+        runCatching { LocalDate.parse(dateText, formatter) }
+            .getOrElse { LocalDate.now(ZoneId.systemDefault()) }
     }
 
-    // Simple validation (optional): show red if invalid and not blank
     val isValid = remember(dateText) {
         dateText.isBlank() || runCatching { LocalDate.parse(dateText, formatter) }.isSuccess
     }
 
     OutlinedTextField(
         value = dateText,
-        onValueChange = { onDateTextChange(it) }, // ✅ manual typing enabled
+        onValueChange = { onDateTextChange(it) },
         label = { Text(label) },
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
@@ -283,6 +282,7 @@ fun PrDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // ✅ Same modern date selector as BodyWeightDialog (manual typing + calendar)
                 DateTextFieldWithCalendar(
                     label = "Date",
                     dateText = date,
