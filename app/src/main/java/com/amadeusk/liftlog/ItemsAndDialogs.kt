@@ -113,7 +113,6 @@ fun PRItem(
     onDelete: () -> Unit,
     onEdit: () -> Unit
 ) {
-    val unitLabel = if (useKg) "kg" else "lb"
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -124,7 +123,7 @@ fun PRItem(
         ) {
             Column {
                 Text(text = pr.exercise, style = MaterialTheme.typography.titleMedium)
-                Text(text = "${formatWeight(pr.weight, useKg)} $unitLabel x ${pr.reps} reps")
+                Text(text = "${formatWeight(pr.weight, useKg)} x ${pr.reps} reps")
                 Text(text = pr.date, style = MaterialTheme.typography.bodySmall)
             }
             Row {
@@ -142,7 +141,6 @@ fun BodyWeightItem(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    val unitLabel = if (useKg) "kg" else "lb"
     Card(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -154,7 +152,7 @@ fun BodyWeightItem(
             Column {
                 Text("Bodyweight", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    text = "${formatWeight(entry.weight, useKg)} $unitLabel",
+                    text = "${formatWeight(entry.weight, useKg)}",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(text = entry.date, style = MaterialTheme.typography.bodySmall)
@@ -246,7 +244,6 @@ fun PrDialog(
     var reps by remember { mutableStateOf(initialReps) }
     var date by remember { mutableStateOf(initialDate) }
 
-    val unitLabel = if (useKg) "kg" else "lb"
 
     // validation
     val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
@@ -286,7 +283,7 @@ fun PrDialog(
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { weight = it },
-                    label = { Text("Weight ($unitLabel)") },
+                    label = { Text("Weight (${if (useKg) "kg" else "lb"})") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = weight.isNotBlank() && !isWeightValid,
@@ -340,7 +337,6 @@ fun BodyWeightDialog(
     var weight by remember { mutableStateOf(initialWeight) }
     var date by remember { mutableStateOf(initialDate) }
 
-    val unitLabel = if (useKg) "kg" else "lb"
     val formatter = remember { DateTimeFormatter.ISO_LOCAL_DATE }
 
     // ✅ Validation: date must be valid, weight must be numeric > 0
@@ -372,7 +368,7 @@ fun BodyWeightDialog(
                 OutlinedTextField(
                     value = weight,
                     onValueChange = { weight = it },
-                    label = { Text("Weight ($unitLabel)") },
+                    label = { Text("Weight (${if (useKg) "kg" else "lb"})") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     isError = weight.isNotBlank() && !isWeightValid,

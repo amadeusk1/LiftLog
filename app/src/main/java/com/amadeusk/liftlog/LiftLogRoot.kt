@@ -163,7 +163,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         )
 
                         selectedGraphPr?.let { pr ->
-                            val unitLabel = if (useKg) "kg" else "lb"
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(
                                 modifier = Modifier
@@ -172,7 +171,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
                                     Text(pr.exercise, style = MaterialTheme.typography.titleSmall)
-                                    Text("Weight: ${formatWeight(pr.weight, useKg)} $unitLabel")
+                                    Text("Weight: ${formatWeight(pr.weight, useKg)}")
                                     Text("Reps: ${pr.reps}")
                                     Text("Date: ${pr.date}")
 
@@ -270,7 +269,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                         )
 
                         selectedBwEntry?.let { entry ->
-                            val unitLabel = if (useKg) "kg" else "lb"
                             Spacer(modifier = Modifier.height(8.dp))
                             Card(
                                 modifier = Modifier
@@ -279,7 +277,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
                                     Text("Bodyweight", style = MaterialTheme.typography.titleSmall)
-                                    Text("Weight: ${formatWeight(entry.weight, useKg)} $unitLabel")
+                                    Text("Weight: ${formatWeight(entry.weight, useKg)}")
                                     Text("Date: ${entry.date}")
 
                                     Spacer(modifier = Modifier.height(8.dp))
