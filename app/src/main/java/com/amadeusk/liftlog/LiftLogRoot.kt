@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,8 @@ import com.amadeusk.liftlog.data.BodyWeightEntry
 import com.amadeusk.liftlog.data.PR
 import com.amadeusk.liftlog.data.loadBodyWeightsFromFile
 import com.amadeusk.liftlog.data.saveBodyWeightsToFile
+
+private enum class TopPage { MAIN, INFO, LEADERBOARD }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,7 +32,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
 
     val exercises = uiState.prs.map { it.exercise }.distinct()
 
-    // 🔹 NEW: always-available core lifts + previous exercises
+    // always-available suggestions
     val coreLifts = listOf("Bench Press", "Squat", "Deadlift")
     val exerciseSuggestions = (coreLifts + exercises).distinct()
 
@@ -47,9 +50,8 @@ fun LiftLogRoot(viewModel: PRViewModel) {
     var useKg by remember { mutableStateOf(true) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    // Info page toggle
-    var showInfoPage by remember { mutableStateOf(false) }
-
+    // Top pages (main tabs vs info vs leaderboard)
+    var topPage by remember { mutableStateOf(TopPage.MAIN) }
 
     Scaffold(
         topBar = {
@@ -57,12 +59,21 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 title = { Text("LiftLog") },
                 navigationIcon = {
                     TextButton(
-                        onClick = { showInfoPage = !showInfoPage }
+                        onClick = {
+                            topPage = if (topPage == TopPage.MAIN) TopPage.INFO else TopPage.MAIN
+                        }
                     ) {
-                        Text(if (showInfoPage) "Back" else "Info")
+                        Text(if (topPage == TopPage.MAIN) "Info" else "Back")
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { topPage = TopPage.LEADERBOARD },
+                        enabled = topPage != TopPage.LEADERBOARD
+                    ) {
+                        Icon(Icons.Filled.Star, contentDescription = "Leaderboard")
+                    }
+
                     IconButton(onClick = { showSettingsDialog = true }) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
@@ -71,7 +82,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         },
         floatingActionButton = {
             // Only show on PRS / Bodyweight
-            if (!showInfoPage && currentTab != LiftLogTab.TOOLS) {
+            if (topPage == TopPage.MAIN && currentTab != LiftLogTab.TOOLS) {
                 FloatingActionButton(
                     onClick = {
                         when (currentTab) {
@@ -93,10 +104,21 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                 .fillMaxSize()
         ) {
 
-            // If Info is active, show only Info screen
-            if (showInfoPage) {
-                InfoScreen()
-                return@Column
+            // If Info / Leaderboard is active, show only that screen
+            when (topPage) {
+                TopPage.INFO -> {
+                    InfoScreen()
+                    return@Column
+                }
+                TopPage.LEADERBOARD -> {
+                    LeaderboardScreen(
+                        prs = uiState.prs,
+                        useKg = useKg,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    return@Column
+                }
+                else -> {}
             }
 
             // ------------------ NORMAL TABS ------------------
@@ -120,7 +142,6 @@ fun LiftLogRoot(viewModel: PRViewModel) {
                     text = { Text("Tools") }
                 )
             }
-
 
             // ------------------ MAIN SCREENS ------------------
             when (currentTab) {
@@ -335,8 +356,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         }
     }
 
-    // --- dialogs unchanged below, except we now pass exerciseSuggestions into PrDialog ---
-
+    // Settings dialog
     if (showSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
@@ -369,7 +389,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             initialReps = "",
             initialDate = "",
             useKg = useKg,
-            exerciseSuggestions = exerciseSuggestions,   // 🔹 NEW
+            exerciseSuggestions = exerciseSuggestions,
             onDismiss = { showAddPrDialog = false },
             onConfirm = { exercise, weightStr, repsStr, date ->
                 val raw = weightStr.toDoubleOrNull() ?: 0.0
@@ -396,7 +416,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
             initialReps = pr.reps.toString(),
             initialDate = pr.date,
             useKg = useKg,
-            exerciseSuggestions = exerciseSuggestions,   // 🔹 NEW
+            exerciseSuggestions = exerciseSuggestions,
             onDismiss = { prBeingEdited = null },
             onConfirm = { exercise, weightStr, repsStr, date ->
                 val newWeightKg = weightStr.toDoubleOrNull()?.fromDisplayWeight(useKg) ?: pr.weight
@@ -414,7 +434,7 @@ fun LiftLogRoot(viewModel: PRViewModel) {
         )
     }
 
-    // Bodyweight dialogs unchanged ...
+    // Bodyweight dialogs
     if (showAddBwDialog) {
         BodyWeightDialog(
             title = "Add bodyweight",
