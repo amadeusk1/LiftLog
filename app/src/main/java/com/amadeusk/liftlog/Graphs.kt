@@ -68,10 +68,9 @@ fun BodyWeightGraph(
     )
 }
 
-fun formatWeight(weightKg: Double, useKg: Boolean): String {
-    val display = weightKg.toDisplayWeight(useKg)
+fun formatWeight(displayWeight: Double, useKg: Boolean): String {
     val unit = if (useKg) "kg" else "lb"
-    return "${"%.1f".format(display)} $unit"
+    return "${"%.1f".format(displayWeight)} $unit"
 }
 
 // If your stored date is already like "2025-12-17", this will show "12/17".
